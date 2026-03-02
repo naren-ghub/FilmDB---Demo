@@ -9,9 +9,12 @@ Also tracks the last active user for auto-login on refresh.
 import json
 import hashlib
 import os
+from pathlib import Path
 from typing import Any, Dict, Optional
 
-_DATA_FILE = os.path.join(os.path.dirname(os.path.dirname(__file__)), ".filmdb_users.json")
+# Resolve to an absolute path relative to the ui/ directory (parent of utils/)
+_UI_DIR = Path(__file__).resolve().parent.parent
+_DATA_FILE = str(_UI_DIR / ".filmdb_users.json")
 
 
 def _load_db() -> Dict[str, Any]:
@@ -30,6 +33,7 @@ def _load_db() -> Dict[str, Any]:
 
 def _save_db(db: Dict[str, Any]) -> None:
     """Write the database to disk."""
+    os.makedirs(os.path.dirname(_DATA_FILE), exist_ok=True)
     with open(_DATA_FILE, "w", encoding="utf-8") as f:
         json.dump(db, f, indent=2, ensure_ascii=False)
 
@@ -55,6 +59,7 @@ def register_user(username: str, password: str) -> bool:
         "username": username,
         "password_hash": _hash_password(password),
         "profile": None,
+        "chat_sessions": {},
     }
     db["last_active_user"] = key
     _save_db(db)
@@ -110,6 +115,26 @@ def get_profile(username: str) -> Optional[Dict[str, Any]]:
 
 def has_profile(username: str) -> bool:
     return get_profile(username) is not None
+
+
+def save_chat_sessions(username: str, sessions: dict) -> None:
+    """Persist the user's in-memory chat session history to disk."""
+    db = _load_db()
+    key = username.lower()
+    if key in db["users"]:
+        # Keep only last 30 sessions to cap file size
+        items = list(sessions.items())[-30:]
+        db["users"][key]["chat_sessions"] = dict(items)
+        _save_db(db)
+
+
+def get_chat_sessions(username: str) -> dict:
+    """Restore persisted chat session history for a user."""
+    db = _load_db()
+    user = db["users"].get(username.lower())
+    if user:
+        return user.get("chat_sessions", {})
+    return {}
 
 
 def delete_user(username: str) -> None:

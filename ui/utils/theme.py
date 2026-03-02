@@ -330,14 +330,6 @@ def load_css() -> None:
     }}
 
     /* ═══════════════════  AUTH  ═══════════════════ */
-    .filmdb-auth-wrapper {{
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        min-height: 80vh;
-        animation: fadeUp 0.45s ease;
-    }}
     .filmdb-auth-card {{
         background: {BG_CARD};
         border: 1px solid {BORDER_SUBTLE};
@@ -346,6 +338,7 @@ def load_css() -> None:
         width: 100%;
         max-width: 420px;
         box-shadow: {SHADOW_LG};
+        animation: fadeUp 0.45s ease;
     }}
     .filmdb-auth-card h2 {{
         text-align: center;
@@ -369,6 +362,7 @@ def load_css() -> None:
         max-width: 580px;
         box-shadow: {SHADOW_LG};
         margin: 0 auto;
+        animation: fadeUp 0.45s ease;
     }}
 
     @keyframes fadeUp {{

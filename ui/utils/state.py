@@ -7,6 +7,7 @@ individual components never have to guess whether a key exists.
 
 import uuid
 import streamlit as st
+from utils.persistence import save_chat_sessions, get_chat_sessions
 
 
 def init_session_state() -> None:
@@ -47,6 +48,10 @@ def new_chat_session() -> None:
             "title": title,
             "messages": list(st.session_state.messages),
         }
+        # Persist to disk immediately so history survives refresh
+        username = st.session_state.get("username")
+        if username:
+            save_chat_sessions(username, st.session_state.chat_sessions)
     st.session_state.session_id = str(uuid.uuid4())
     st.session_state.messages = []
     st.session_state.processing = False
@@ -73,5 +78,9 @@ def restore_chat_session(sid: str) -> None:
 def delete_chat_session(sid: str) -> None:
     """Remove a chat session from history."""
     st.session_state.chat_sessions.pop(sid, None)
+    # Persist the removal
+    username = st.session_state.get("username")
+    if username:
+        save_chat_sessions(username, st.session_state.chat_sessions)
     if st.session_state.session_id == sid:
         new_chat_session()

@@ -11,7 +11,7 @@ import streamlit as st
 
 # ── page config must be the very first Streamlit call ──
 st.set_page_config(
-    page_title="FilmDB – Cinematic Intelligence",
+    page_title="FilmDB - DEMO",
     page_icon="🍿",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -23,6 +23,7 @@ from utils.theme import load_css                         # noqa: E402
 from utils.persistence import (                          # noqa: E402
     get_last_active_user,
     get_profile,
+    get_chat_sessions,
 )
 from components.auth import (                            # noqa: E402
     show_login_modal,
@@ -55,6 +56,11 @@ def _try_auto_login() -> None:
             st.session_state.user_profile = profile
         else:
             st.session_state.profile_completed = False
+
+        # Restore persisted chat history so sidebar shows previous sessions
+        saved_sessions = get_chat_sessions(username)
+        if saved_sessions:
+            st.session_state.chat_sessions = saved_sessions
 
 
 def main() -> None:

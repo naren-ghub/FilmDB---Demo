@@ -15,19 +15,30 @@ from utils.persistence import (
     get_profile,
     has_profile,
     set_last_active_user,
+    get_chat_sessions,
 )
 
 
 # ─────────────────────────  LOGIN  ─────────────────────────
 def show_login_modal() -> None:
-    st.markdown("<div class='filmdb-auth-wrapper'>", unsafe_allow_html=True)
+    # Hide sidebar during auth and adjust padding
+    st.markdown(
+        """<style>
+        section[data-testid='stSidebar']{display:none !important;}
+        .block-container{padding-top:0 !important; padding-bottom:0 !important;}
+        </style>""",
+        unsafe_allow_html=True,
+    )
 
-    _col, centre, _col2 = st.columns([1, 1.4, 1])
+    # Vertical spacer to center the card
+    st.markdown("<div style='height:10vh;'></div>", unsafe_allow_html=True)
+
+    _col, centre, _col2 = st.columns([1.2, 1, 1.2])
     with centre:
         st.markdown(
             """
             <div class='filmdb-auth-card'>
-                <h2>🍿 FilmDB</h2>
+                <h2>🍿 FilmDB <span style='font-size:0.5em;color:#6c6c80;'>DEMO</span></h2>
                 <p class='subtitle'>Your personal cinematic intelligence</p>
             </div>
             """,
@@ -54,9 +65,6 @@ def show_login_modal() -> None:
                         # ── new user: register ──
                         register_user(uname, password)
                         _login_user(uname)
-                        st.toast(f"Welcome, {uname}! Account created.", icon="🎉")
-
-    st.markdown("</div>", unsafe_allow_html=True)
 
 
 def _login_user(username: str) -> None:
@@ -74,6 +82,11 @@ def _login_user(username: str) -> None:
         st.session_state.user_profile = profile
     else:
         st.session_state.profile_completed = False
+
+    # Restore persisted chat session history so sidebar shows previous chats
+    saved_sessions = get_chat_sessions(username)
+    if saved_sessions:
+        st.session_state.chat_sessions = saved_sessions
 
     st.rerun()
 
@@ -97,9 +110,15 @@ _PLATFORMS = [
 
 
 def show_personalization_modal() -> None:
-    st.markdown("<div class='filmdb-auth-wrapper'>", unsafe_allow_html=True)
+    # Hide sidebar during profile setup
+    st.markdown(
+        "<style>section[data-testid='stSidebar']{display:none !important;}</style>",
+        unsafe_allow_html=True,
+    )
 
-    _c, centre, _c2 = st.columns([1, 2.2, 1])
+    st.markdown("<div style='height:4vh;'></div>", unsafe_allow_html=True)
+
+    _c, centre, _c2 = st.columns([0.8, 2, 0.8])
     with centre:
         st.markdown(
             "<div class='filmdb-profile-card'>"
@@ -172,5 +191,3 @@ def show_personalization_modal() -> None:
                     st.session_state.profile_completed = True
                     st.session_state.user_profile = profile
                     st.rerun()
-
-    st.markdown("</div>", unsafe_allow_html=True)

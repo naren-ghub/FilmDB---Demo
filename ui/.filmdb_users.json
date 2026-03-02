@@ -1,0 +1,83 @@
+{
+  "users": {
+    "naren": {
+      "username": "Naren",
+      "password_hash": "97e73da0a101717aa4fa3054d6a33a8a22ac14ff50c413a435afe9c1bf4ddf41",
+      "profile": {
+        "region": "India",
+        "genres": [
+          "Action",
+          "Crime",
+          "Thriller"
+        ],
+        "platforms": [
+          "Netflix",
+          "Prime Video",
+          "Hotstar"
+        ],
+        "fav_movies": [
+          "Godfather",
+          "Hey Ram",
+          "Tokyo Sonata"
+        ],
+        "fav_actors": [
+          "Kamal hassan",
+          "Sivaji"
+        ],
+        "fav_directors": [
+          "Michael Haneke",
+          "Kieslowsky",
+          "Tarkovsky"
+        ]
+      }
+    },
+    "testuser": {
+      "username": "testuser",
+      "password_hash": "ecd71870d1963316a97e3ac3408c9835ad8cf0f3c1bc703527c30265534f75ae",
+      "profile": {
+        "region": "India",
+        "genres": [
+          "Action",
+          "Sci-Fi",
+          "Drama"
+        ],
+        "platforms": [
+          "Netflix",
+          "Prime Video"
+        ],
+        "fav_movies": [
+          "Inception"
+        ],
+        "fav_actors": [
+          "Keanu Reeves"
+        ],
+        "fav_directors": [
+          "Christopher Nolan"
+        ]
+      }
+    },
+    "admin": {
+      "username": "admin",
+      "password_hash": "8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918",
+      "profile": {
+        "region": "India",
+        "genres": [
+          "Sci-Fi",
+          "Thriller",
+          "Comedy"
+        ],
+        "platforms": [],
+        "fav_movies": [
+          "Inception"
+        ],
+        "fav_actors": [
+          "Keanu Reeves"
+        ],
+        "fav_directors": [
+          "Christopher Nolan"
+        ]
+      }
+    }
+  },
+  "last_active_user": "admin"
+}
