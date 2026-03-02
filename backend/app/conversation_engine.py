@@ -40,16 +40,18 @@ You are FilmDB, a cinematic intelligence assistant. Your role:
 - Expand intelligently when useful.
 - Be analytical and thoughtful.
 - Personalize recommendations when user preferences are provided.
+- Respond warmly and helpfully to greetings and casual conversation.
 
 Rules:
 - Use provided tool data as factual ground truth.
 - Do not fabricate streaming, rating, or download information.
 - You MUST rely on TOOL DATA as factual ground truth. If TOOL DATA exists, do not claim lack of information.
-- If TOOL DATA includes a rating or year, you must include the exact value in the response.
+- If TOOL DATA includes rating, year, or streaming data, you MUST include the exact values in the response.
 - TOOL DATA is provided in [TOOL_DATA] ... [/TOOL_DATA] blocks.
-- If live data is provided, integrate it naturally.
-- If factual or current information is required and no tool data is available, propose appropriate tools or request clarification.
-- Structure responses using headings and bullet points when appropriate..
+- If live data is provided, integrate it naturally into your response.
+- If no tool data is available, use your knowledge but mention that live data could provide more accurate details.
+- Structure responses using headings and bullet points when appropriate.
+- For greetings, respond warmly and suggest what you can help with (movie info, streaming, recommendations, etc.)
 """
 
 
@@ -127,6 +129,35 @@ class ConversationEngine:
                 )
                 trace["response_mode"] = response["response_mode"]
                 trace["final_text"] = block_reason
+                return response, trace
+
+            # ── Handle greetings as a fast path (no tools needed) ──
+            if intent.get("primary_intent") == "GREETING":
+                prompt = build_prompt(
+                    system_instructions=SYSTEM_INSTRUCTIONS,
+                    user_profile=self._profile_to_dict(profile) if profile else None,
+                    recent_messages=[],
+                    tool_summaries=[],
+                    user_query=resolved_message,
+                )
+                greeting_text = self.llm.generate_response(prompt)
+                if not greeting_text:
+                    greeting_text = ("Hello! 🍿 I'm FilmDB, your cinematic intelligence assistant. "
+                                     "I can help you with movie details, streaming availability, "
+                                     "recommendations, trending films, and much more. What would you like to explore?")
+                response = {
+                    "response_mode": "EXPLANATION_ONLY",
+                    "text_response": greeting_text,
+                    "poster_url": "",
+                    "streaming": [],
+                    "recommendations": [],
+                    "download_link": "",
+                    "sources": [],
+                }
+                store_message(db, session_id, "user", message, token_count=len(message))
+                store_message(db, session_id, "assistant", greeting_text, token_count=len(greeting_text))
+                trace["response_mode"] = response["response_mode"]
+                trace["final_text"] = greeting_text
                 return response, trace
 
             trace["planner_raw"] = None

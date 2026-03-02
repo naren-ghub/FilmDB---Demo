@@ -17,13 +17,13 @@ _AWARD_KEYWORDS = ("oscar", "oscars", "academy awards", "nominations", "best pic
 
 
 def _normalize(text: str) -> str:
-    cleaned = re.sub(r"[^a-z0-9\\s]", " ", text.lower())
-    cleaned = re.sub(r"\\s+", " ", cleaned).strip()
+    cleaned = re.sub(r"[^a-z0-9\s]", " ", text.lower())
+    cleaned = re.sub(r"\s+", " ", cleaned).strip()
     return cleaned
 
 
 def _extract_year(text: str) -> int | None:
-    match = re.search(r"\\b(18|19|20)\\d{2}\\b", text)
+    match = re.search(r"\b(18|19|20)\d{2}\b", text)
     if not match:
         return None
     try:

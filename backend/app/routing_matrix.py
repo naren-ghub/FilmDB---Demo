@@ -4,12 +4,12 @@ from typing import Any
 ROUTING_MATRIX: dict[str, dict[str, list[str]]] = {
     "ENTITY_LOOKUP": {
         "required": ["imdb"],
-        "optional": ["wikipedia"],
+        "optional": ["wikipedia", "watchmode"],
         "forbidden": ["archive"],
     },
     "ANALYTICAL_EXPLANATION": {
-        "required": ["imdb"],
-        "optional": ["web_search","wikipedia"],
+        "required": ["imdb", "wikipedia"],
+        "optional": ["web_search"],
         "forbidden": ["archive"],
     },
     "AVAILABILITY": {
@@ -24,7 +24,7 @@ ROUTING_MATRIX: dict[str, dict[str, list[str]]] = {
     },
     "RECOMMENDATION": {
         "required": ["similarity"],
-        "optional": ["web_search"],
+        "optional": ["imdb", "web_search"],
         "forbidden": [],
     },
     "DOWNLOAD": {
@@ -44,12 +44,12 @@ ROUTING_MATRIX: dict[str, dict[str, list[str]]] = {
     },
     "REVIEWS": {
         "required": ["rt_reviews"],
-        "optional": ["web_search", "wikipedia"],
+        "optional": ["imdb", "web_search", "wikipedia"],
         "forbidden": [],
     },
     "TRENDING": {
-        "required": ["imdb_trending_tamil"],
-        "optional": ["web_search"],
+        "required": ["imdb_trending_tamil", "web_search"],
+        "optional": [],
         "forbidden": [],
     },
     "OFFICIAL": {
@@ -65,7 +65,7 @@ ROUTING_MATRIX: dict[str, dict[str, list[str]]] = {
     "AWARD_LOOKUP": {
         "required": ["web_search"],
         "optional": ["wikipedia"],
-        "forbidden": ["imdb", "archive"],
+        "forbidden": ["archive"],
     },
     "TOP_RATED": {
         "required": ["imdb_top_rated_english"],
@@ -78,20 +78,31 @@ ROUTING_MATRIX: dict[str, dict[str, list[str]]] = {
         "forbidden": [],
     },
     "PERSON_LOOKUP": {
-        "required": ["imdb_person"],
-        "optional": ["web_search", "wikipedia"],
+        "required": ["imdb_person", "wikipedia"],
+        "optional": ["web_search"],
         "forbidden": [],
     },
     "COMPARISON": {
         "required": ["web_search"],
-        "optional": ["wikipedia"],
+        "optional": ["imdb", "wikipedia"],
         "forbidden": ["archive"],
+    },
+    # ── New intents ──
+    "GREETING": {
+        "required": [],
+        "optional": [],
+        "forbidden": [],
+    },
+    "GENERAL_CONVERSATION": {
+        "required": ["web_search"],
+        "optional": ["wikipedia"],
+        "forbidden": [],
     },
 }
 
 
 def build_tool_plan(intent: dict[str, Any], planner_tools: list[dict]) -> dict[str, list[str]]:
-    primary = intent.get("primary_intent", "ENTITY_LOOKUP")
+    primary = intent.get("primary_intent", "GENERAL_CONVERSATION")
     secondary = intent.get("secondary_intents", [])
     intents = [primary] + [i for i in secondary if isinstance(i, str)]
     confidence = intent.get("confidence", 100)
@@ -101,7 +112,10 @@ def build_tool_plan(intent: dict[str, Any], planner_tools: list[dict]) -> dict[s
     forbidden: set[str] = set()
 
     for intent_name in intents:
-        policy = ROUTING_MATRIX.get(intent_name, ROUTING_MATRIX["ENTITY_LOOKUP"])
+        policy = ROUTING_MATRIX.get(intent_name)
+        if not policy:
+            # Unknown intent → fallback to web_search
+            policy = ROUTING_MATRIX["GENERAL_CONVERSATION"]
         required.update(policy.get("required", []))
         optional.update(policy.get("optional", []))
         forbidden.update(policy.get("forbidden", []))
@@ -111,7 +125,8 @@ def build_tool_plan(intent: dict[str, Any], planner_tools: list[dict]) -> dict[s
     }
     optional.update(planner_names)
 
-    if isinstance(confidence, int) and confidence < 35:
+    # Low confidence → add web_search as safety net
+    if isinstance(confidence, int) and confidence < 60:
         required.add("web_search")
 
     forbidden -= required

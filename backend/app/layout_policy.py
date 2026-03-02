@@ -53,6 +53,8 @@ def select_response_mode(
                     has_list = True
                     break
         return "RECOMMENDATION_GRID" if has_list else "EXPLANATION_ONLY"
+    if primary_intent in ("GREETING", "GENERAL_CONVERSATION"):
+        return "EXPLANATION_ONLY"
 
     if "AVAILABILITY" in secondary_intents and has_streaming:
         return "EXPLANATION_PLUS_AVAILABILITY"
