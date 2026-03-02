@@ -1,0 +1,73 @@
+code_snippets:
+
+IMDB:
+url = "https://imdb236.p.rapidapi.com/api/imdb/%7BimdbId%7D/tmdb-id"
+
+headers = {
+ 	"x-rapidapi-key": "IMDB_HOST",
+ 	"x-rapidapi-host": "imdb236.p.rapidapi.com"
+}
+
+response = requests.get(url, headers=headers)
+
+print(response.json())
+
+-----------------------------------
+
+Movie similarity Engine:
+import requests
+
+url = "https://movie-similarity-engine.p.rapidapi.com/movies/17777/similar"
+
+querystring = {"limit":"12"}
+
+headers = {
+ 	"x-rapidapi-key": "SIMILARITY_HOST",
+ 	"x-rapidapi-host": "movie-similarity-engine.p.rapidapi.com"
+}
+
+response = requests.get(url, headers=headers, params=querystring)
+
+print(response.json())
+
+-----------------------------------
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

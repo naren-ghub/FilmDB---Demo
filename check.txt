@@ -1,0 +1,134 @@
+1️⃣ IMDb (Metadata + Search by Title)
+RapidAPI – imdb8
+Step 1: Search by Title
+GET https://imdb8.p.rapidapi.com/title/find?q={movie_title}
+
+Extract:
+
+IMDb ID (tconst, e.g., tt0068646)
+
+Step 2: Fetch Metadata
+GET https://imdb8.p.rapidapi.com/title/get-overview-details?tconst={imdb_id}
+
+Headers:
+
+X-RapidAPI-Key
+X-RapidAPI-Host: imdb8.p.rapidapi.com
+
+Normalize into:
+
+{
+  "status": "success",
+  "data": {
+    "title": "...",
+    "year": "...",
+    "rating": "...",
+    "cast": [...],
+    "director": "...",
+    "poster_url": "..."
+  }
+}
+
+Cache metadata for 24 hours.
+
+2️⃣ Wikipedia (Overview / Biography)
+
+No API key required.
+
+GET https://en.wikipedia.org/api/rest_v1/page/summary/{title}
+
+Return normalized:
+
+{
+  "status": "success",
+  "data": {
+    "summary": "...",
+    "thumbnail": "..."
+  }
+}
+3️⃣ Watchmode (Streaming)
+
+Base:
+
+https://api.watchmode.com/v1/
+Search:
+GET /search/?apiKey=KEY&search_field=name&search_value={title}
+Get Sources:
+GET /title/{watchmode_id}/sources/?apiKey=KEY&regions=IN
+
+Normalize:
+
+{
+  "status": "success",
+  "data": {
+    "region": "IN",
+    "platforms": [...]
+  }
+}
+
+Cache for 24 hours.
+
+4️⃣ Similarity (Recommendations)
+
+Use either:
+
+Option A (Preferred): TMDB Similar
+GET https://api.themoviedb.org/3/movie/{movie_id}/similar
+
+OR
+
+Option B: RapidAPI Similarity
+GET https://movie-similarity.p.rapidapi.com/similar/{imdb_id}
+
+If using IMDb ID:
+
+Ensure IMDb executes first
+
+Then execute similarity
+
+This is a dependency-based execution case.
+
+5️⃣ Archive (Public Domain Download)
+
+Search:
+
+GET https://archive.org/advancedsearch.php?q=title:({title}) AND mediatype:(movies)&output=json
+
+Normalize:
+
+{
+  "status": "success" | "not_found",
+  "data": {
+    "download_link": "..."
+  }
+}
+
+Only return legal public domain results.
+
+6️⃣ Web Search (Serper.dev)
+
+Endpoint:
+
+POST https://google.serper.dev/search
+
+Headers:
+
+X-API-KEY
+Content-Type: application/json
+
+Body:
+
+{
+  "q": "The Godfather audience reviews influence cinema",
+  "gl": "in"
+}
+
+Normalize:
+
+{
+  "status": "success",
+  "data": {
+    "summary": "...",
+    "sources": [...]
+  }
+}
