@@ -22,7 +22,7 @@ _ALIAS_MAP = {
     "academy awards 2026": "98th Academy Awards",
 }
 
-_AWARD_KEYWORDS = ("oscar", "oscars", "academy awards", "nominations", "best picture")
+_AWARD_KEYWORDS = ("oscar", "oscars", "academy awards", "nominations", "best picture","BAFTA")
 
 # Phrases to strip from user messages to extract the actual movie/person name
 _FILLER_PATTERNS = [
