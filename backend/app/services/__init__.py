@@ -5,6 +5,7 @@ from app.services import (
     imdb_person_service,
     rt_reviews_service,
     similarity_service,
+    tmdb_service,
     watchmode_service,
     web_search_service,
     wikipedia_service,

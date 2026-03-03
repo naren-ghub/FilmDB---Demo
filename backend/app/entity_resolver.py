@@ -8,12 +8,43 @@ _ALIAS_MAP = {
     "god father": "The Godfather",
     "godfather": "The Godfather",
     "the god father": "The Godfather",
+    "piano teacher": "The Piano Teacher",
+    "the piano teacher": "The Piano Teacher",
+    "shawshank": "The Shawshank Redemption",
+    "shawshank redemption": "The Shawshank Redemption",
+    "dark knight": "The Dark Knight",
+    "the dark knight": "The Dark Knight",
+    "fight club": "Fight Club",
+    "inception": "Inception",
+    "interstellar": "Interstellar",
     "oscar 2026": "98th Academy Awards",
     "oscars 2026": "98th Academy Awards",
     "academy awards 2026": "98th Academy Awards",
 }
 
 _AWARD_KEYWORDS = ("oscar", "oscars", "academy awards", "nominations", "best picture")
+
+# Phrases to strip from user messages to extract the actual movie/person name
+_FILLER_PATTERNS = [
+    r"^(?:tell me about|what (?:is|are)|show me|find|search for|look up|get|give me)\s+",
+    r"^(?:who is|who are|who was)\s+",
+    r"^(?:plot (?:summary|of)|summary of|synopsis of|overview of|details of|info on|information about)\s+",
+    r"^(?:where can i (?:stream|watch)|stream|watch)\s+",
+    r"^(?:movies? (?:similar|like) (?:to)?|similar (?:movies?|films?) (?:to|like)?)\s+",
+    r"^(?:(?:is|are) .+ (?:available|streaming) (?:on|in)?)\s+",
+    r"^(?:best (?:movies?|films?) (?:by|of|from))\s+",
+    r"^(?:filmography (?:of|for)?|filmography)\s+",
+    r"^(?:(?:top|best) (?:3|three|5|five|10|ten) (?:movies?|films?) (?:of|by|from)?)\s+",
+    r"^(?:awards? (?:won |received )?(?:by|of|for)?)\s+",
+    r"^(?:biography (?:of|for)?)\s+",
+]
+
+# Trailing noise to strip
+_TRAILING_PATTERNS = [
+    r"\s+(?:movie|film|series|show|documentary)$",
+    r"\s+(?:in \w+|\d{4})$",
+    r"\s*\?$",
+]
 
 
 def _normalize(text: str) -> str:
@@ -32,6 +63,25 @@ def _extract_year(text: str) -> int | None:
         return None
 
 
+def _clean_entity_from_message(text: str) -> str:
+    """Strip common filler phrases to extract the core entity name from a message."""
+    cleaned = text.strip()
+    # Strip leading filler phrases (apply repeatedly to catch stacked patterns)
+    for _ in range(3):
+        prev = cleaned
+        for pattern in _FILLER_PATTERNS:
+            cleaned = re.sub(pattern, "", cleaned, flags=re.IGNORECASE).strip()
+        if cleaned == prev:
+            break
+    # Strip trailing noise
+    for pattern in _TRAILING_PATTERNS:
+        cleaned = re.sub(pattern, "", cleaned, flags=re.IGNORECASE).strip()
+    # Remove surrounding quotes
+    if len(cleaned) > 2 and cleaned[0] in ('"', "'", "\u201c") and cleaned[-1] in ('"', "'", "\u201d"):
+        cleaned = cleaned[1:-1].strip()
+    return cleaned if cleaned else text.strip()
+
+
 def _extract_candidate(message: str, intent: dict[str, Any]) -> str:
     entities = intent.get("entities", [])
     if entities:
@@ -42,7 +92,8 @@ def _extract_candidate(message: str, intent: dict[str, Any]) -> str:
                 return value.strip()
         if isinstance(first, str) and first.strip():
             return first.strip()
-    return message.strip()
+    # Fallback: try to extract entity name from the raw message
+    return _clean_entity_from_message(message)
 
 
 def _infer_entity_type(message: str, intent: dict[str, Any]) -> str | None:

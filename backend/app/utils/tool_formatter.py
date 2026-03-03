@@ -18,7 +18,23 @@ def summarize_tool_data(tool_name: str, output: dict) -> str:
         title = data.get("title")
         year = data.get("year")
         rating = data.get("rating")
-        return f"source: imdb title: {title} year: {year} rating: {rating}"
+        rating_count = data.get("rating_count")
+        director = data.get("director")
+        cast = data.get("cast", [])
+        plot = data.get("plot", "")
+        genres = data.get("genres", [])
+        parts = [f"source: imdb title: {title} year: {year} rating: {rating}"]
+        if rating_count:
+            parts.append(f"votes: {rating_count}")
+        if director:
+            parts.append(f"director: {director}")
+        if cast:
+            parts.append(f"cast: {', '.join(cast[:5])}")
+        if genres:
+            parts.append(f"genres: {', '.join(genres[:5])}")
+        if plot:
+            parts.append(f"plot: {plot[:200]}")
+        return " | ".join(parts)
     if tool_name == "wikipedia":
         summary = data.get("summary", "")
         return f"source: wikipedia summary: {summary[:180]}"

@@ -22,6 +22,6 @@ class Settings:
     RT_API_KEY = os.getenv("RT_API_KEY")
     RT_HOST = os.getenv("RT_HOST", "rottentomatoes.p.rapidapi.com")
     RT_REVIEWS_PATH = os.getenv("RT_REVIEWS_PATH", "/api/rotten-tomatoes/movie-reviews")
-    HTTP_TIMEOUT_SECONDS = float(os.getenv("HTTP_TIMEOUT_SECONDS", "10"))
+    HTTP_TIMEOUT_SECONDS = float(os.getenv("HTTP_TIMEOUT_SECONDS", "15"))
 
 settings = Settings()

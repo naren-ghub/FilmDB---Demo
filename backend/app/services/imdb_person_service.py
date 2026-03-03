@@ -1,7 +1,12 @@
 import httpx
+import logging
 
 from app.config import settings
 from app.utils.tool_formatter import normalize_tool_output
+
+logger = logging.getLogger(__name__)
+
+_MAX_RETRIES = 2
 
 
 def _pick_person_id(payload: dict) -> str | None:
@@ -39,6 +44,31 @@ def _normalize_person(payload: dict) -> dict:
     }
 
 
+async def _request_with_retry(client: httpx.AsyncClient, url: str, headers: dict, params: dict) -> httpx.Response:
+    """Make an HTTP GET with retry logic for transient failures."""
+    last_error = None
+    for attempt in range(_MAX_RETRIES + 1):
+        try:
+            resp = await client.get(url, headers=headers, params=params)
+            resp.raise_for_status()
+            return resp
+        except httpx.TimeoutException:
+            last_error = f"timeout (attempt {attempt + 1})"
+            logger.warning(f"IMDb Person API timeout: {url} (attempt {attempt + 1})")
+            continue
+        except httpx.HTTPStatusError as e:
+            if 400 <= e.response.status_code < 500:
+                raise
+            last_error = f"HTTP {e.response.status_code} (attempt {attempt + 1})"
+            logger.warning(f"IMDb Person API error: {url} - {last_error}")
+            continue
+        except Exception as e:
+            last_error = str(e)
+            logger.warning(f"IMDb Person API error: {url} - {e} (attempt {attempt + 1})")
+            continue
+    raise httpx.ConnectError(f"All {_MAX_RETRIES + 1} attempts failed: {last_error}")
+
+
 async def run(name: str | None = None, imdb_id: str | None = None) -> dict:
     if not settings.RAPIDAPI_KEY:
         return normalize_tool_output("error", {"reason": "missing_rapidapi_key"})
@@ -52,11 +82,11 @@ async def run(name: str | None = None, imdb_id: str | None = None) -> dict:
         async with httpx.AsyncClient(timeout=settings.HTTP_TIMEOUT_SECONDS) as client:
             try:
                 find_url = f"https://{settings.IMDB_HOST}/name/find"
-                find_resp = await client.get(find_url, headers=headers, params={"q": name})
-                find_resp.raise_for_status()
+                find_resp = await _request_with_retry(client, find_url, headers, {"q": name.strip()})
                 imdb_id = _pick_person_id(find_resp.json())
-            except Exception:
-                return normalize_tool_output("error", {"name": name})
+            except Exception as e:
+                logger.error(f"IMDb Person find failed for '{name}': {e}")
+                return normalize_tool_output("error", {"name": name, "reason": str(e)})
 
     if not imdb_id:
         return normalize_tool_output("not_found", {"name": name})
@@ -68,11 +98,11 @@ async def run(name: str | None = None, imdb_id: str | None = None) -> dict:
     url = f"https://{settings.IMDB236_HOST}/api/imdb/name/{imdb_id}"
     async with httpx.AsyncClient(timeout=settings.HTTP_TIMEOUT_SECONDS) as client:
         try:
-            resp = await client.get(url, headers=headers_person)
-            resp.raise_for_status()
+            resp = await _request_with_retry(client, url, headers_person, {})
             payload = resp.json()
-        except Exception:
-            return normalize_tool_output("error", {"imdb_id": imdb_id})
+        except Exception as e:
+            logger.error(f"IMDb Person details failed for '{imdb_id}': {e}")
+            return normalize_tool_output("error", {"imdb_id": imdb_id, "reason": str(e)})
 
     data = _normalize_person(payload if isinstance(payload, dict) else {})
     data["imdb_id"] = imdb_id

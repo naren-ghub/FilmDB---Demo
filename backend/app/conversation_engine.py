@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import re
 import time
 from typing import Any, Dict, List
 
@@ -298,11 +299,15 @@ class ConversationEngine:
         if not session_ctx:
             return message
         text = message.lower()
-        if any(p in text for p in ["him", "her", "his", "hers"]) and session_ctx.last_person:
+
+        def _has_word(word: str) -> bool:
+            return bool(re.search(r'\b' + re.escape(word) + r'\b', text))
+
+        if any(_has_word(p) for p in ["him", "her", "his", "hers"]) and session_ctx.last_person:
             return message + f" (refers to {session_ctx.last_person})"
-        if any(p in text for p in ["it", "its", "that movie", "this film"]) and session_ctx.last_movie:
+        if any(_has_word(p) for p in ["it", "its", "that movie", "this film"]) and session_ctx.last_movie:
             return message + f" (refers to {session_ctx.last_movie})"
-        if any(p in text for p in ["it", "its", "that", "this"]) and session_ctx.last_entity:
+        if any(_has_word(p) for p in ["it", "its", "that", "this"]) and session_ctx.last_entity:
             return message + f" (refers to {session_ctx.last_entity})"
         return message
 
@@ -438,21 +443,22 @@ class ConversationEngine:
         if outputs.get("imdb"):
             imdb_id = outputs["imdb"].get("data", {}).get("imdb_id")
 
-        if similarity_call and not settings.TMDB_API_KEY:
+        if similarity_call:
             if not imdb_id and imdb_call and imdb_call.get("name") not in outputs:
                 imdb_args = imdb_call.get("arguments", {})
                 start = time.monotonic()
-                imdb_result = await services.imdb_service.run(imdb_args.get("title", ""))
+                # Use TMDB to get imdb_id for similarity lookup
+                tmdb_result = await services.tmdb_service.run(imdb_args.get("title", ""))
                 elapsed_ms = int((time.monotonic() - start) * 1000)
-                outputs["imdb"] = imdb_result
+                outputs["imdb"] = tmdb_result
                 store_tool_call(
                     session_id=session_id,
                     tool_name="imdb",
                     request_payload=imdb_args,
-                    response_status=imdb_result.get("status", "error"),
+                    response_status=tmdb_result.get("status", "error"),
                     execution_time_ms=elapsed_ms,
                 )
-                imdb_id = imdb_result.get("data", {}).get("imdb_id")
+                imdb_id = tmdb_result.get("data", {}).get("imdb_id")
 
             if imdb_id:
                 similarity_call.setdefault("arguments", {})["imdb_id"] = imdb_id
@@ -506,7 +512,8 @@ class ConversationEngine:
         if profile and getattr(profile, "region", None):
             region = profile.region
         if tool_name == "imdb":
-            return services.imdb_service.run(args.get("title", ""))
+            # Use TMDB as primary source (RapidAPI IMDb key expired)
+            return services.tmdb_service.run(args.get("title", ""))
         if tool_name == "wikipedia":
             return services.wikipedia_service.run(args.get("title", ""))
         if tool_name == "watchmode":
@@ -526,8 +533,9 @@ class ConversationEngine:
         if tool_name == "imdb_upcoming":
             return services.discovery_engine_service.run_upcoming(args.get("country") or region)
         if tool_name == "imdb_person":
-            return services.imdb_person_service.run(
-                name=args.get("name"), imdb_id=args.get("imdb_id")
+            # Use TMDB person lookup (RapidAPI IMDb key expired)
+            return services.tmdb_service.get_person(
+                name=args.get("name", "")
             )
         if tool_name == "rt_reviews":
             return services.rt_reviews_service.run(args.get("title", ""))

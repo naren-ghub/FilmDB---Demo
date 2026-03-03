@@ -1,3 +1,4 @@
+import re
 from typing import Any
 
 
@@ -20,7 +21,12 @@ def should_block(intent: dict[str, Any], message: str, has_context: bool) -> tup
     return False, ""
 
 
+def _has_whole_word(text: str, word: str) -> bool:
+    """Check if `word` appears as a whole word in `text`, not as a substring."""
+    return bool(re.search(r'\b' + re.escape(word) + r'\b', text))
+
+
 def _is_pronoun_only(message: str) -> bool:
     text = message.lower().strip()
     pronouns = ["him", "her", "it", "that", "this", "they", "them"]
-    return len(text.split()) <= 4 and any(p in text for p in pronouns)
+    return len(text.split()) <= 4 and any(_has_whole_word(text, p) for p in pronouns)
