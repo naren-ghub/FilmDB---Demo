@@ -5,13 +5,20 @@ Production-grade ChatGPT-like chat with:
 • Deterministic response_mode rendering (FULL_CARD, RECOMMENDATION_GRID, etc.)
 • Animated message bubbles with markdown support
 • Enhanced Quick Actions with contextual inputs
-• Sidebar with chat history, feature shortcuts, and profile section
+• Sidebar with searchable chat history, feature shortcuts, and profile section
+• Kebab menu for chat management (rename, clear, delete)
 • Starter prompt cards for empty sessions
 """
 
 import random
 import streamlit as st
-from utils.state import new_chat_session, restore_chat_session, delete_chat_session
+from utils.state import (
+    new_chat_session,
+    restore_chat_session,
+    delete_chat_session,
+    rename_chat_session,
+    clear_chat_messages,
+)
 from utils.markdown_renderer import md_to_html
 from utils.persistence import clear_last_active_user
 from api_client import send_chat_message
@@ -43,7 +50,9 @@ def render_sidebar() -> None:
         st.markdown(
             "<div style='text-align:center;margin-bottom:0.5rem;'>"
             "<span style='font-size:1.4rem;font-weight:800;letter-spacing:-0.02em;'>"
-            "🍿 <span style='color:#c9a227;'>Film</span>DB<span style='color:#6c6c80;font-size:0.7rem;margin-left:6px;'>DEMO</span></span></div>",
+            "🍿 <span style='color:#c9a227;'>Film</span>DB"
+            "<span style='color:#6c6c80;font-size:0.7rem;margin-left:6px;'>DEMO</span>"
+            "</span></div>",
             unsafe_allow_html=True,
         )
 
@@ -54,29 +63,8 @@ def render_sidebar() -> None:
             st.rerun()
         st.markdown("</div>", unsafe_allow_html=True)
 
-        # ── chat history (right below New Chat) ──
-        sessions = st.session_state.get("chat_sessions", {})
-        if sessions:
-            st.markdown(
-                "<p style='font-size:0.72rem;text-transform:uppercase;"
-                "letter-spacing:0.08em;color:#6c6c80;font-weight:600;"
-                "margin:0.6rem 0 0.3rem;'>History</p>",
-                unsafe_allow_html=True,
-            )
-            for sid, meta in list(sessions.items())[:15]:
-                col_title, col_del = st.columns([5, 1])
-                with col_title:
-                    if st.button(
-                        f"💬 {meta['title']}",
-                        key=f"hist_{sid}",
-                        use_container_width=True,
-                    ):
-                        restore_chat_session(sid)
-                        st.rerun()
-                with col_del:
-                    if st.button("🗑", key=f"del_{sid}"):
-                        delete_chat_session(sid)
-                        st.rerun()
+        # ── chat history (always visible) ──
+        _render_chat_history()
 
         st.markdown("---")
 
@@ -87,7 +75,6 @@ def render_sidebar() -> None:
             "margin-bottom:0.3rem;'>Quick Actions</p>",
             unsafe_allow_html=True,
         )
-
         _render_quick_actions()
 
         st.markdown("---")
@@ -109,6 +96,111 @@ def render_sidebar() -> None:
             clear_last_active_user()
             st.session_state.clear()
             st.rerun()
+
+
+# ═══════════════════════════════════════════════════════════════
+#  CHAT HISTORY (always visible, searchable, editable titles)
+# ═══════════════════════════════════════════════════════════════
+
+def _render_chat_history() -> None:
+    """Render the full chat history section in the sidebar with search."""
+    sessions = st.session_state.get("chat_sessions", {})
+
+    # Also ensure current session with messages is counted
+    current_has_messages = bool(st.session_state.messages)
+
+    st.markdown(
+        "<p style='font-size:0.72rem;text-transform:uppercase;"
+        "letter-spacing:0.08em;color:#6c6c80;font-weight:600;"
+        "margin:0.6rem 0 0.3rem;'>Chat History</p>",
+        unsafe_allow_html=True,
+    )
+
+    if not sessions and not current_has_messages:
+        st.markdown(
+            "<p style='font-size:0.8rem;color:#6c6c80;font-style:italic;"
+            "margin:0.3rem 0;'>No conversations yet</p>",
+            unsafe_allow_html=True,
+        )
+        return
+
+    # ── search box ──
+    search_query = st.text_input(
+        "🔍 Search chats",
+        value=st.session_state.get("history_search", ""),
+        key="history_search_input",
+        placeholder="Search by title…",
+        label_visibility="collapsed",
+    )
+    st.session_state.history_search = search_query
+
+    # Build sorted list: most recent first
+    all_sessions = list(sessions.items())
+    all_sessions.reverse()  # newest first
+
+    # Filter by search
+    if search_query.strip():
+        query_lower = search_query.strip().lower()
+        all_sessions = [
+            (sid, meta) for sid, meta in all_sessions
+            if query_lower in meta.get("title", "").lower()
+        ]
+
+    if not all_sessions:
+        st.markdown(
+            "<p style='font-size:0.8rem;color:#6c6c80;font-style:italic;"
+            "margin:0.3rem 0;'>No matches found</p>",
+            unsafe_allow_html=True,
+        )
+        return
+
+    # ── render list (capped at 30) ──
+    for sid, meta in all_sessions[:30]:
+        title = meta.get("title", "Untitled")
+        msg_count = len(meta.get("messages", []))
+        is_active = sid == st.session_state.session_id
+
+        # Highlight active session
+        active_style = "color:#c9a227;font-weight:600;" if is_active else ""
+        indicator = "▶ " if is_active else "💬 "
+
+        col_title, col_edit, col_del = st.columns([5, 1, 1])
+        with col_title:
+            if st.button(
+                f"{indicator}{title}",
+                key=f"hist_{sid}",
+                use_container_width=True,
+                help=f"{msg_count} messages",
+            ):
+                restore_chat_session(sid)
+                st.rerun()
+        with col_edit:
+            if st.button("✏️", key=f"edit_{sid}", help="Rename"):
+                st.session_state[f"renaming_{sid}"] = True
+                st.rerun()
+        with col_del:
+            if st.button("🗑", key=f"del_{sid}", help="Delete"):
+                delete_chat_session(sid)
+                st.rerun()
+
+        # Inline rename form
+        if st.session_state.get(f"renaming_{sid}"):
+            new_title = st.text_input(
+                "New title",
+                value=title,
+                key=f"rename_input_{sid}",
+                label_visibility="collapsed",
+            )
+            col_save, col_cancel = st.columns(2)
+            with col_save:
+                if st.button("Save", key=f"rename_save_{sid}", use_container_width=True):
+                    rename_chat_session(sid, new_title)
+                    st.session_state.pop(f"renaming_{sid}", None)
+                    st.rerun()
+            with col_cancel:
+                if st.button("Cancel", key=f"rename_cancel_{sid}", use_container_width=True):
+                    st.session_state.pop(f"renaming_{sid}", None)
+                    st.rerun()
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -273,12 +365,16 @@ def _render_quick_actions() -> None:
 # ═══════════════════════════════════════════════════════════════
 
 def render_chat_interface() -> None:
-    # ── title bar ──
-    st.markdown(
-        "<div class='filmdb-title'>🍿 <span>Film</span>DB <span style='font-size:0.55em;color:#6c6c80;'>DEMO</span></div>"
-        "<div class='filmdb-subtitle'>Personalised cinematic intelligence — powered by deterministic AI</div>",
-        unsafe_allow_html=True,
-    )
+    # ── title bar with kebab menu ──
+    title_col, menu_col = st.columns([6, 1])
+    with title_col:
+        st.markdown(
+            "<div class='filmdb-title'>🍿 <span>Film</span>DB "
+            "<span style='font-size:0.55em;color:#6c6c80;'>DEMO</span></div>",
+            unsafe_allow_html=True,
+        )
+    with menu_col:
+        _render_kebab_menu()
 
     # ── starter cards (only when chat is empty) ──
     if not st.session_state.messages:
@@ -299,6 +395,74 @@ def render_chat_interface() -> None:
     prompt = st.chat_input("Ask FilmDB about movies, actors, or streaming…")
     if prompt:
         _inject_user_message(prompt)
+
+
+# ═══════════════════════════════════════════════════════════════
+#  KEBAB MENU (three-dot chat management)
+# ═══════════════════════════════════════════════════════════════
+
+def _render_kebab_menu() -> None:
+    """Three-dot kebab menu for rename, clear, delete actions on current chat."""
+    sessions = st.session_state.get("chat_sessions", {})
+    current_sid = st.session_state.session_id
+    current_title = ""
+    if current_sid in sessions:
+        current_title = sessions[current_sid].get("title", "")
+
+    with st.popover("⋮", help="Chat options"):
+        st.markdown(
+            "<p style='font-size:0.75rem;color:#6c6c80;text-transform:uppercase;"
+            "letter-spacing:0.06em;font-weight:600;margin-bottom:0.5rem;'>Chat Options</p>",
+            unsafe_allow_html=True,
+        )
+
+        # ── Rename ──
+        if st.session_state.get("kebab_renaming"):
+            new_name = st.text_input(
+                "New title",
+                value=current_title,
+                key="kebab_rename_input",
+                label_visibility="collapsed",
+            )
+            c1, c2 = st.columns(2)
+            with c1:
+                if st.button("✓ Save", key="kebab_rename_save", use_container_width=True):
+                    if new_name.strip():
+                        # If current session isn't archived yet, archive it first
+                        if current_sid not in sessions and st.session_state.messages:
+                            first_msg = st.session_state.messages[0].get("content", "Untitled")
+                            sessions[current_sid] = {
+                                "title": new_name.strip()[:64],
+                                "messages": list(st.session_state.messages),
+                            }
+                            st.session_state.chat_sessions = sessions
+                        rename_chat_session(current_sid, new_name)
+                    st.session_state.pop("kebab_renaming", None)
+                    st.rerun()
+            with c2:
+                if st.button("✕ Cancel", key="kebab_rename_cancel", use_container_width=True):
+                    st.session_state.pop("kebab_renaming", None)
+                    st.rerun()
+        else:
+            if st.button("✏️  Rename Chat", key="kebab_rename_btn", use_container_width=True):
+                st.session_state["kebab_renaming"] = True
+                st.rerun()
+
+        # ── Clear Chat ──
+        if st.button("🧹  Clear Chat", key="kebab_clear_btn", use_container_width=True,
+                      help="Clears all messages but keeps the session"):
+            clear_chat_messages()
+            st.rerun()
+
+        # ── Delete Chat ──
+        if st.button("🗑️  Delete Chat", key="kebab_delete_btn", use_container_width=True,
+                      help="Permanently removes this chat"):
+            if current_sid in sessions:
+                delete_chat_session(current_sid)
+            else:
+                st.session_state.messages = []
+                st.session_state.session_id = __import__("uuid").uuid4().__str__()
+            st.rerun()
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -542,4 +706,24 @@ def _process_pending_message() -> None:
 
     resp["role"] = "assistant"
     st.session_state.messages.append(resp)
+
+    # Auto-save current session to history after each response
+    sid = st.session_state.session_id
+    sessions = st.session_state.get("chat_sessions", {})
+    if sid not in sessions:
+        first_msg = st.session_state.messages[0].get("content", "Untitled")
+        title = first_msg[:48] + ("…" if len(first_msg) > 48 else "")
+    else:
+        title = sessions[sid].get("title", "Untitled")
+    sessions[sid] = {
+        "title": title,
+        "messages": list(st.session_state.messages),
+    }
+    st.session_state.chat_sessions = sessions
+    # Persist to disk
+    username = st.session_state.get("username")
+    if username:
+        from utils.persistence import save_chat_sessions
+        save_chat_sessions(username, sessions)
+
     st.rerun()

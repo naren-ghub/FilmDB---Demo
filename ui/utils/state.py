@@ -32,6 +32,9 @@ def init_session_state() -> None:
 
         # ── theme ──
         "theme": "dark",
+
+        # ── chat history search ──
+        "history_search": "",
     }
     for key, value in _defaults.items():
         if key not in st.session_state:
@@ -49,9 +52,7 @@ def new_chat_session() -> None:
             "messages": list(st.session_state.messages),
         }
         # Persist to disk immediately so history survives refresh
-        username = st.session_state.get("username")
-        if username:
-            save_chat_sessions(username, st.session_state.chat_sessions)
+        _persist_sessions()
     st.session_state.session_id = str(uuid.uuid4())
     st.session_state.messages = []
     st.session_state.processing = False
@@ -73,14 +74,40 @@ def restore_chat_session(sid: str) -> None:
         st.session_state.session_id = sid
         st.session_state.messages = list(session["messages"])
         st.session_state.processing = False
+        _persist_sessions()
 
 
 def delete_chat_session(sid: str) -> None:
     """Remove a chat session from history."""
     st.session_state.chat_sessions.pop(sid, None)
-    # Persist the removal
+    _persist_sessions()
+    if st.session_state.session_id == sid:
+        st.session_state.session_id = str(uuid.uuid4())
+        st.session_state.messages = []
+        st.session_state.processing = False
+
+
+def rename_chat_session(sid: str, new_title: str) -> None:
+    """Rename a chat session's title."""
+    session = st.session_state.chat_sessions.get(sid)
+    if session and new_title.strip():
+        session["title"] = new_title.strip()[:64]
+        _persist_sessions()
+
+
+def clear_chat_messages() -> None:
+    """Clear all messages in the CURRENT session (keep the session alive)."""
+    st.session_state.messages = []
+    st.session_state.processing = False
+    # Update the stored session if it exists in history
+    sid = st.session_state.session_id
+    if sid in st.session_state.chat_sessions:
+        st.session_state.chat_sessions[sid]["messages"] = []
+        _persist_sessions()
+
+
+def _persist_sessions() -> None:
+    """Save chat sessions to disk."""
     username = st.session_state.get("username")
     if username:
         save_chat_sessions(username, st.session_state.chat_sessions)
-    if st.session_state.session_id == sid:
-        new_chat_session()

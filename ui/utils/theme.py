@@ -435,15 +435,64 @@ def load_css() -> None:
         font-size: 1.5rem;
         letter-spacing: -0.02em;
         color: {TEXT_PRIMARY};
-        margin-bottom: 0.1rem;
+        margin-bottom: 0.5rem;
     }}
     .filmdb-title span {{
         color: {ACCENT_GOLD};
     }}
-    .filmdb-subtitle {{
-        font-size: 0.82rem;
-        color: {TEXT_MUTED};
-        margin-bottom: 1.5rem;
+
+    /* ═══════════════════  KEBAB MENU  ═══════════════════ */
+    [data-testid="stPopover"] > button {{
+        background: transparent !important;
+        border: 1px solid {BORDER_SUBTLE} !important;
+        border-radius: {RADIUS_SM} !important;
+        color: {TEXT_SECONDARY} !important;
+        font-size: 1.2rem !important;
+        padding: 0.3rem 0.6rem !important;
+        min-height: 2rem !important;
+        line-height: 1 !important;
+        transition: all 0.2s ease !important;
+    }}
+    [data-testid="stPopover"] > button:hover {{
+        background: {BG_ELEVATED} !important;
+        color: {ACCENT_GOLD} !important;
+        border-color: {ACCENT_GOLD} !important;
+    }}
+    [data-testid="stPopoverBody"] {{
+        background: {BG_CARD} !important;
+        border: 1px solid {BORDER_SUBTLE} !important;
+        border-radius: {RADIUS_MD} !important;
+        box-shadow: {SHADOW_LG} !important;
+        padding: 0.8rem !important;
+    }}
+    [data-testid="stPopoverBody"] .stButton > button {{
+        background: transparent !important;
+        color: {TEXT_SECONDARY} !important;
+        border: 1px solid {BORDER_SUBTLE} !important;
+        border-radius: {RADIUS_SM} !important;
+        font-size: 0.85rem !important;
+        padding: 0.45rem 0.8rem !important;
+        text-align: left !important;
+        transition: all 0.2s ease !important;
+    }}
+    [data-testid="stPopoverBody"] .stButton > button:hover {{
+        background: {BG_ELEVATED} !important;
+        color: {ACCENT_GOLD} !important;
+        border-color: {ACCENT_GOLD} !important;
+    }}
+
+    /* ═══════════════════  CHAT HISTORY SEARCH  ═══════════════════ */
+    section[data-testid="stSidebar"] .stTextInput input[placeholder*="Search"] {{
+        background: {BG_INPUT} !important;
+        border: 1px solid {BORDER_SUBTLE} !important;
+        border-radius: 20px !important;
+        padding: 0.4rem 0.9rem !important;
+        font-size: 0.82rem !important;
+        color: {TEXT_SECONDARY} !important;
+    }}
+    section[data-testid="stSidebar"] .stTextInput input[placeholder*="Search"]:focus {{
+        border-color: {ACCENT_GOLD} !important;
+        box-shadow: 0 0 0 2px rgba(201,162,39,.15) !important;
     }}
 
     /* ═══════════════════  SIDEBAR PROFILE FOOTER  ═══════════════════ */

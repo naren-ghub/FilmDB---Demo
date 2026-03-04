@@ -220,6 +220,46 @@
               "role": "assistant"
             }
           ]
+        },
+        "9f9425c3-617c-420c-8e68-c9fa08bf598c": {
+          "title": "What are the latest and most popular movies stre…",
+          "messages": [
+            {
+              "role": "user",
+              "content": "What are the latest and most popular movies streaming in India?"
+            },
+            {
+              "text_response": "## Latest Movies in India\nUnfortunately, the latest trending Tamil movies on IMDB are currently unavailable due to an error. However, based on the available data, here are some of the top movies in India:\n* Accused, ranked 1\n* Chatha Pacha, ranked 2\n* Anaganaga Oka Raju, ranked 3\n* Dhurandhar, ranked 5\n* Tere Ishk Mein, ranked 6\n* Firebreak, ranked 1 (note: ranking category not specified)\n\n## Popular Movies\nThese movies seem to be gaining attention, but the exact streaming information is not available. For the most accurate and up-to-date details, I recommend checking a reliable streaming platform or movie database.\n\n## Recommendations\nIf you're looking for personalized movie recommendations or streaming options, please let me know your preferences (genre, language, etc.), and I'll do my best to assist you. Alternatively, you can also check online streaming platforms for their latest offerings and trending movies in India.",
+              "poster_url": "",
+              "streaming": [],
+              "recommendations": [],
+              "download_link": "",
+              "sources": [
+                {
+                  "title": "Top 10 Most Popular Movies on Netflix Right Now in India",
+                  "link": "https://www.netflix.com/tudum/top10/india/films"
+                },
+                {
+                  "title": "Trending Movies",
+                  "link": "https://www.imdb.com/india/trending/"
+                },
+                {
+                  "title": "Best Movies to Stream at Home (2026)",
+                  "link": "https://www.rottentomatoes.com/browse/movies_at_home/sort:popular"
+                },
+                {
+                  "title": "Popular Movies",
+                  "link": "https://www.hotstar.com/in/browse/leaderboard/popular-movies/reco-pop_CgNBbGwaB0FCTW92aWUiA0FsbA"
+                },
+                {
+                  "title": "New Prime Video Movies List (2026)",
+                  "link": "https://www.91mobiles.com/entertainment/best-prime-video-movies"
+                }
+              ],
+              "response_mode": "RECOMMENDATION_GRID",
+              "role": "assistant"
+            }
+          ]
         }
       }
     }
