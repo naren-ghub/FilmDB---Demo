@@ -63,8 +63,8 @@ ROUTING_MATRIX: dict[str, dict[str, list[str]]] = {
         "forbidden": [],
     },
     "AWARD_LOOKUP": {
-        "required": ["web_search"],
-        "optional": ["wikipedia"],
+        "required": ["wikipedia,web_search"],
+        "optional": ["imdb"],
         "forbidden": ["archive"],
     },
     "TOP_RATED": {
