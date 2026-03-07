@@ -1,6 +1,6 @@
 # 🎬 FilmDB -- Demo
 
-## 🍿 UI Architecture Specification (ChatGPT-Like Personalized Cinematic Interface)
+## 🍿 UI Architecture Specification
 
 **Version:** 1.0\
 **Date:** 2026-03-02\
@@ -41,16 +41,16 @@ The UI must:
 
 # 3. Application Layout Structure
 
-    ---------------------------------------------------------
-    | Sidebar |              Main Chat Area                |
-    |         |-------------------------------------------|
-    | Search  | Title: 🍿 FilmDB – Demo                   |
-    | New Chat|                                           |
-    | History | Scrollable Chat Container                 |
-    | Features|                                           |
-    |         |-------------------------------------------|
-    | Profile | Input Field + Send Button                |
-    ---------------------------------------------------------
+    ----------------------------------------------------------
+    | Sidebar  |  Main Chat Area                  |  (⋮)  |
+    |          |--------------------------------------------|
+    |Search 🔍 | Title: 🍿 FilmDB – Demo                    |
+    |New Chat  |                                            |
+    |History   | Scrollable Chat Container                  |
+    |Features  |                                            |
+    |          |--------------------------------------------|
+    | Profile  | Input Field + Send Button                 |
+    ----------------------------------------------------------
 
 ------------------------------------------------------------------------
 
@@ -145,7 +145,19 @@ After successful login, a dynamic modal appears.
 
 **🍿 FilmDB -- Demo**
 
-Professional typography (Inter or SF Pro).
+-   Professional typography (Inter).
+-   Clean title bar without subtitles for a minimal look.
+-   Kebab Menu (⋮) located in the top-right corner for session management.
+
+------------------------------------------------------------------------
+
+## 6.5 Chat Management (Kebab Menu)
+
+A three-dot popover menu in the top-right allows:
+
+-   **Rename Chat:** Manually override the auto-generated title.
+-   **Clear Chat:** Empties all messages while retaining the `session_id`.
+-   **Delete Chat:** Permanently removes the session from history and starts a new one.
 
 ------------------------------------------------------------------------
 
@@ -265,17 +277,23 @@ Cards disappear after first user interaction.
 
 ## 13.1 Chat Search
 
-Real-time filtering.
+-   Real-time filtering via search box at the top of the history list.
+-   Searches through chat titles.
+-   Persistent search state in `session_state`.
 
 ## 13.2 New Chat
 
-Creates new session_id.
+-   Creates a fresh `session_id`.
+-   Clears the active message screen.
+-   Immediately accessible via a prominent gold button.
 
-## 13.3 Chat History
+## 13.3 Chat History (Always Visible)
 
--   Auto-title (first message)
--   Editable title
--   Delete option
+-   **Auto-Naming:** Automatically generates a title from the first message.
+-   **Sorting:** Newest sessions appear at the top.
+-   **Limit:** Displays the last 30 sessions.
+-   **Quick Actions:** Rename (✏️) and Delete (🗑) buttons directly on each history item.
+-   **Persistent:** History is reloaded from disk on app launch and saved after every assistant response.
 
 ------------------------------------------------------------------------
 

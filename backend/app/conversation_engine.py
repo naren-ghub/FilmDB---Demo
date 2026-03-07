@@ -1,7 +1,10 @@
 import asyncio
+import json
 import logging
 import re
 import time
+from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Dict, List
 
 from app.config import settings
@@ -33,6 +36,15 @@ from app.routing_matrix import build_tool_plan
 from app.utils.prompt_builder import build_prompt
 from app.utils.tool_formatter import summarize_all
 from app import services
+from app.services.kb import (
+    kb_entity_lookup,
+    kb_plot_analysis,
+    kb_critic_summary,
+    kb_movie_similarity,
+    kb_top_rated,
+    kb_person_filmography,
+    kb_movie_comparison,
+)
 
 
 SYSTEM_INSTRUCTIONS = """
@@ -131,6 +143,7 @@ class ConversationEngine:
                 )
                 trace["response_mode"] = response["response_mode"]
                 trace["final_text"] = block_reason
+                self._write_llm_report(trace, response)
                 return response, trace
 
             # ── Handle greetings as a fast path (no tools needed) ──
@@ -160,6 +173,7 @@ class ConversationEngine:
                 store_message(db, session_id, "assistant", greeting_text, token_count=len(greeting_text))
                 trace["response_mode"] = response["response_mode"]
                 trace["final_text"] = greeting_text
+                self._write_llm_report(trace, response)
                 return response, trace
 
             trace["planner_raw"] = None
@@ -250,6 +264,7 @@ class ConversationEngine:
                 if session_ctx_after
                 else None
             )
+            self._write_llm_report(trace, response)
             return response, trace
         finally:
             db.close()
@@ -273,9 +288,45 @@ class ConversationEngine:
         region = None
         if profile and getattr(profile, "region", None):
             region = profile.region
+
+        # Extract second entity for comparison
+        title_b = None
+        primary = intent.get("primary_intent", "")
+        if primary == "COMPARISON":
+            entities = intent.get("entities", [])
+            movie_entities = [e for e in entities if isinstance(e, dict) and e.get("type") == "movie"]
+            if len(movie_entities) >= 2:
+                title = movie_entities[0].get("value", title)
+                title_b = movie_entities[1].get("value", "")
+
+        # Extract genre/year/language for top_rated
+        genre_filter = None
+        year_filter = None
+        language_filter = None
+        entities = intent.get("entities", [])
+        for ent in entities:
+            if isinstance(ent, dict):
+                if ent.get("type") == "genre":
+                    genre_filter = ent.get("value")
+                elif ent.get("type") == "year":
+                    year_filter = ent.get("value")
+
+        # Try to extract genre/language from the message itself
+        lowered = message.lower()
+        for lang in ["tamil", "hindi", "malayalam", "telugu", "kannada", "bengali", "marathi"]:
+            if lang in lowered:
+                language_filter = lang.capitalize()
+                break
+        for g in ["action", "comedy", "drama", "horror", "thriller",
+                  "romance", "sci-fi", "animation", "documentary", "mystery"]:
+            if g in lowered and not genre_filter:
+                genre_filter = g.capitalize()
+                break
+
         tool_calls = []
         for name in tool_names:
             args: dict[str, Any] = {}
+            # ── API tools ────────────────────────────────────────────────
             if name in ("imdb", "wikipedia", "similarity", "archive"):
                 args = {"title": title}
             elif name == "watchmode":
@@ -292,6 +343,21 @@ class ConversationEngine:
                 args = {"name": person_name}
             elif name == "rt_reviews":
                 args = {"title": title}
+            # ── KB tools ─────────────────────────────────────────────────
+            elif name in ("kb_entity", "kb_plot", "kb_critic", "kb_similarity"):
+                args = {"title": title}
+            elif name == "kb_top_rated":
+                args = {}
+                if genre_filter:
+                    args["genre"] = genre_filter
+                if year_filter:
+                    args["year"] = year_filter
+                if language_filter:
+                    args["language"] = language_filter
+            elif name == "kb_filmography":
+                args = {"name": person_name}
+            elif name == "kb_comparison":
+                args = {"title_a": title, "title_b": title_b or ""}
             tool_calls.append({"name": name, "arguments": args})
         return tool_calls
 
@@ -303,9 +369,17 @@ class ConversationEngine:
         def _has_word(word: str) -> bool:
             return bool(re.search(r'\b' + re.escape(word) + r'\b', text))
 
+        def _has_phrase(phrase: str) -> bool:
+            return phrase in text
+
         if any(_has_word(p) for p in ["him", "her", "his", "hers"]) and session_ctx.last_person:
             return message + f" (refers to {session_ctx.last_person})"
-        if any(_has_word(p) for p in ["it", "its", "that movie", "this film"]) and session_ctx.last_movie:
+        # Movie references — check multi-word phrases first, then single words
+        movie_phrases = ["the film", "the movie", "that movie", "that film",
+                         "this film", "this movie"]
+        movie_words = ["it", "its"]
+        if (any(_has_phrase(p) for p in movie_phrases) or
+                any(_has_word(p) for p in movie_words)) and session_ctx.last_movie:
             return message + f" (refers to {session_ctx.last_movie})"
         if any(_has_word(p) for p in ["it", "its", "that", "this"]) and session_ctx.last_entity:
             return message + f" (refers to {session_ctx.last_entity})"
@@ -346,10 +420,20 @@ class ConversationEngine:
         return [call for call in tool_calls if call.get("name") != "archive"]
 
     def _needs_grounding_retry(self, tool_outputs: dict[str, dict], final_text: str) -> bool:
+        # Check API IMDb data
         imdb = tool_outputs.get("imdb")
         if imdb and imdb.get("status") == "success":
             rating = imdb.get("data", {}).get("rating")
             year = imdb.get("data", {}).get("year")
+            if rating and str(rating) not in final_text:
+                return True
+            if year and str(year) not in final_text:
+                return True
+        # Check KB entity data
+        kb = tool_outputs.get("kb_entity")
+        if kb and kb.get("status") == "success":
+            rating = kb.get("data", {}).get("imdb_rating")
+            year = kb.get("data", {}).get("year")
             if rating and str(rating) not in final_text:
                 return True
             if year and str(year) not in final_text:
@@ -360,6 +444,9 @@ class ConversationEngine:
         imdb = tool_outputs.get("imdb")
         if imdb and imdb.get("status") == "success":
             return imdb.get("data", {}).get("title")
+        kb = tool_outputs.get("kb_entity")
+        if kb and kb.get("status") == "success":
+            return kb.get("data", {}).get("title")
         return None
 
     def _extract_person_from_intent(self, intent: dict[str, Any]) -> str | None:
@@ -478,7 +565,14 @@ class ConversationEngine:
                 tasks.append(task)
 
         start_times = [time.monotonic() for _ in tasks]
-        results = await asyncio.gather(*tasks, return_exceptions=True)
+        try:
+            results = await asyncio.wait_for(
+                asyncio.gather(*tasks, return_exceptions=True),
+                timeout=45.0,
+            )
+        except asyncio.TimeoutError:
+            self.logger.warning("Tool execution timed out after 45s")
+            results = [TimeoutError("Tool execution timed out") for _ in tasks]
         timings: list[dict[str, Any]] = []
 
         for idx, ((tool_name, args), result) in enumerate(zip(tool_names, results)):
@@ -539,6 +633,27 @@ class ConversationEngine:
             )
         if tool_name == "rt_reviews":
             return services.rt_reviews_service.run(args.get("title", ""))
+        # ── KB tools ─────────────────────────────────────────────────────
+        if tool_name == "kb_entity":
+            return kb_entity_lookup.run(args.get("title", ""))
+        if tool_name == "kb_plot":
+            return kb_plot_analysis.run(args.get("title", ""))
+        if tool_name == "kb_critic":
+            return kb_critic_summary.run(args.get("title", ""))
+        if tool_name == "kb_similarity":
+            return kb_movie_similarity.run(args.get("title", ""))
+        if tool_name == "kb_top_rated":
+            return kb_top_rated.run(
+                genre=args.get("genre"),
+                year=args.get("year"),
+                language=args.get("language"),
+            )
+        if tool_name == "kb_filmography":
+            return kb_person_filmography.run(args.get("name", ""))
+        if tool_name == "kb_comparison":
+            return kb_movie_comparison.run(
+                args.get("title_a", ""), args.get("title_b", "")
+            )
         return None
 
     def _build_response(self, text: str, tool_outputs: Dict[str, Dict]) -> Dict[str, Any]:
@@ -550,9 +665,16 @@ class ConversationEngine:
             "download_link": "",
             "sources": [],
         }
+        # Poster from IMDb/TMDB API
         imdb = tool_outputs.get("imdb")
         if imdb and imdb.get("status") == "success":
             response["poster_url"] = imdb.get("data", {}).get("poster_url", "")
+        # Poster from KB entity (TMDB poster_path)
+        kb_entity = tool_outputs.get("kb_entity")
+        if kb_entity and kb_entity.get("status") == "success" and not response["poster_url"]:
+            poster_path = kb_entity.get("data", {}).get("poster_path", "")
+            if poster_path:
+                response["poster_url"] = f"https://image.tmdb.org/t/p/w500{poster_path}"
         imdb_person = tool_outputs.get("imdb_person")
         if imdb_person and imdb_person.get("status") == "success":
             response["poster_url"] = (
@@ -566,6 +688,18 @@ class ConversationEngine:
         similarity = tool_outputs.get("similarity")
         if similarity and similarity.get("status") == "success":
             response["recommendations"] = similarity.get("data", {}).get("recommendations", [])
+        # KB similarity recommendations
+        kb_sim = tool_outputs.get("kb_similarity")
+        if kb_sim and kb_sim.get("status") == "success" and not response["recommendations"]:
+            recs = kb_sim.get("data", {}).get("recommendations", [])
+            response["recommendations"] = [
+                {"title": r.get("title"), "year": r.get("year"), "imdb_id": r.get("imdb_id")}
+                for r in recs
+            ]
+        # KB top rated movie list
+        kb_top = tool_outputs.get("kb_top_rated")
+        if kb_top and kb_top.get("status") == "success" and not response["recommendations"]:
+            response["recommendations"] = kb_top.get("data", {}).get("movies", [])
         if not response["recommendations"]:
             for list_tool in ("imdb_trending_tamil", "imdb_top_rated_english", "imdb_upcoming"):
                 output = tool_outputs.get(list_tool)
@@ -589,6 +723,135 @@ class ConversationEngine:
             "favorite_movies": getattr(profile, "favorite_movies", None),
             "response_style": getattr(profile, "response_style", None),
         }
+
+    # ─── LLM Report Writer ────────────────────────────────────────────────
+
+    _REPORT_PATH = Path(__file__).resolve().parent.parent.parent / "llm_report.md"
+
+    def _write_llm_report(
+        self, trace: dict[str, Any], response: dict[str, Any]
+    ) -> None:
+        """Append a structured run entry to llm_report.md."""
+        try:
+            now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+            msg = trace.get("message", "")
+            resolved = trace.get("resolved_message", msg)
+
+            # ── Intent ──
+            intent = trace.get("intent", {})
+            primary = intent.get("primary_intent", "UNKNOWN")
+            confidence = intent.get("confidence", "?")
+            entities = intent.get("entities", [])
+
+            # ── Routing ──
+            routing = trace.get("routing_matrix", {})
+            required_tools = routing.get("required", [])
+            optional_tools = routing.get("optional", [])
+
+            # ── Tool execution ──
+            tool_exec = trace.get("tool_execution", {})
+            cache_hits = tool_exec.get("cache_hits", [])
+            cache_misses = tool_exec.get("cache_misses", [])
+            timings = tool_exec.get("tool_timings", [])
+
+            # ── Build report ──
+            lines: list[str] = []
+            lines.append(f"# LLM Backend Report")
+            lines.append(f"")
+            lines.append(f"## Run - {now}")
+            lines.append(f'Query: "{msg}"')
+            if resolved != msg:
+                lines.append(f'Resolved: "{resolved}"')
+            lines.append(f"")
+
+            # Intent
+            lines.append(f"Intent:")
+            lines.append(f"- Primary: {primary} (confidence: {confidence})")
+            if entities:
+                ent_str = ", ".join(
+                    f'{e.get("type","?")}: {e.get("value","?")}'
+                    for e in entities if isinstance(e, dict)
+                )
+                lines.append(f"- Entities: [{ent_str}]")
+            lines.append(f"")
+
+            # Backend flow
+            lines.append(f"Backend Flow:")
+            lines.append(f"- API/Engine Entry: ConversationEngine.run(session_id, user_id, message)")
+            lines.append(f"- Intent Classification: {primary}")
+            if trace.get("entity_resolution"):
+                er = trace["entity_resolution"]
+                lines.append(f"- Entity Resolution: {er.get('entity_type','?')} = {er.get('entity_value','?')}")
+            lines.append(f"- Routing: required={required_tools}, optional={optional_tools}")
+            lines.append(f"- Governance: filter_tool_calls")
+
+            # Tool calls
+            approved = trace.get("tool_calls_approved", [])
+            rejected = trace.get("tool_calls_rejected", [])
+            approved_names = [c.get("name", "?") for c in approved if isinstance(c, dict)]
+            rejected_names = [c.get("name", "?") for c in rejected if isinstance(c, dict)]
+            lines.append(f"- Tool Calls Approved ({len(approved)}): {approved_names}")
+            if rejected:
+                lines.append(f"- Tool Calls Rejected ({len(rejected)}): {rejected_names}")
+            lines.append(f"- Prompt Build: build_prompt(...)")
+            lines.append(f"- LLM Final Response: GroqClient.generate_response(prompt)")
+            lines.append(f"- DB: store_message(role='user') + store_message(role='assistant')")
+            lines.append(f"")
+
+            # Cache
+            lines.append(f"Cache:")
+            lines.append(f"- Hits: {', '.join(cache_hits) if cache_hits else 'none'}")
+            lines.append(f"- Misses: {', '.join(cache_misses) if cache_misses else 'none'}")
+            lines.append(f"")
+
+            # Tool timings
+            lines.append(f"Tool Calls:")
+            if timings:
+                for t in timings:
+                    lines.append(
+                        f"- {t['tool']}: status={t['status']}, "
+                        f"execution_time_ms={t['execution_time_ms']}, "
+                        f"args={t.get('arguments', {})}"
+                    )
+            else:
+                lines.append(f"- none")
+            lines.append(f"")
+
+            # Response mode
+            lines.append(f"Response Mode: {response.get('response_mode', '?')}")
+            lines.append(f"")
+
+            # Session context
+            ctx_before = trace.get("session_context_before")
+            ctx_after = trace.get("session_context_after")
+            if ctx_before or ctx_after:
+                lines.append(f"Session Context:")
+                if ctx_before:
+                    lines.append(f"- Before: last_movie={ctx_before.get('last_movie')}, "
+                                 f"last_person={ctx_before.get('last_person')}, "
+                                 f"last_entity={ctx_before.get('last_entity')}, "
+                                 f"last_intent={ctx_before.get('last_intent')}")
+                if ctx_after:
+                    lines.append(f"- After:  last_movie={ctx_after.get('last_movie')}, "
+                                 f"last_person={ctx_after.get('last_person')}, "
+                                 f"last_entity={ctx_after.get('last_entity')}, "
+                                 f"last_intent={ctx_after.get('last_intent')}")
+                lines.append(f"")
+
+            # Exact response
+            lines.append(f"Exact Response:")
+            lines.append(f"```json")
+            lines.append(json.dumps(response, indent=2, ensure_ascii=False))
+            lines.append(f"```")
+            lines.append(f"")
+
+            report_text = "\n".join(lines)
+            with open(self._REPORT_PATH, "a", encoding="utf-8") as f:
+                f.write(report_text + "\n")
+
+            self.logger.info("LLM report appended to %s", self._REPORT_PATH)
+        except Exception:
+            self.logger.exception("Failed to write LLM report")
 
     def _update_caches(self, outputs: Dict[str, Dict]) -> None:
         db = SessionLocal()

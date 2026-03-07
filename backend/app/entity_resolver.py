@@ -1,3 +1,4 @@
+import logging
 import re
 from difflib import get_close_matches
 from typing import Any
@@ -98,13 +99,17 @@ def _extract_candidate(message: str, intent: dict[str, Any]) -> str:
 
 def _infer_entity_type(message: str, intent: dict[str, Any]) -> str | None:
     primary = intent.get("primary_intent", "")
-    if primary in ("PERSON_LOOKUP",):
+    if primary in ("PERSON_LOOKUP", "FILMOGRAPHY"):
         return "person"
     if primary in ("AWARD_LOOKUP",):
         return "award_event"
     if primary in ("TRENDING", "UPCOMING", "TOP_RATED", "STREAMING_DISCOVERY"):
         return "catalog"
     if primary in ("DOWNLOAD", "LEGAL_DOWNLOAD", "STREAMING_AVAILABILITY"):
+        return "movie"
+    if primary in ("ENTITY_LOOKUP", "PLOT_EXPLANATION", "CRITIC_SUMMARY",
+                   "MOVIE_SIMILARITY", "COMPARISON", "REVIEWS",
+                   "ANALYTICAL_EXPLANATION", "RECOMMENDATION"):
         return "movie"
     lowered = message.lower()
     if lowered.startswith("who is") or "biography" in lowered:
@@ -115,6 +120,8 @@ def _infer_entity_type(message: str, intent: dict[str, Any]) -> str | None:
 
 
 class EntityResolver:
+    _log = logging.getLogger(__name__)
+
     def resolve(self, message: str, intent: dict[str, Any]) -> dict[str, Any]:
         normalized_message = _normalize(message)
         year = _extract_year(normalized_message)
@@ -134,6 +141,10 @@ class EntityResolver:
         entity_value = canonical or candidate
         canonical_id = None
 
+        # Attempt imdb_id resolution via KB for movie entities
+        if entity_type == "movie" and entity_value:
+            canonical_id = self._resolve_imdb_id(entity_value, str(year) if year else None)
+
         public_domain = False
         if year is not None and year < 1928:
             public_domain = True
@@ -145,3 +156,13 @@ class EntityResolver:
             "year": year,
             "public_domain": public_domain,
         }
+
+    def _resolve_imdb_id(self, title: str, year: str | None = None) -> str | None:
+        """Try to resolve title to imdb_id via the FilmDB KB."""
+        try:
+            from rag.filmdb_query_engine import FilmDBQueryEngine
+            engine = FilmDBQueryEngine.get_instance()
+            return engine.resolve_title_to_imdb_id(title, year)
+        except Exception as exc:
+            self._log.debug("KB imdb_id resolution failed: %s", exc)
+            return None

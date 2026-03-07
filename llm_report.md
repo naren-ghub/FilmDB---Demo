@@ -2652,3 +2652,747 @@ Exact Response:
   "response_mode": "AVAILABILITY_FOCUS"
 }
 ```
+# LLM Backend Report
+
+## Run - 2026-03-06 05:02:03 UTC
+Query: "award recieved by the film"
+
+Intent:
+- Primary: AWARD_LOOKUP (confidence: 85)
+
+Backend Flow:
+- API/Engine Entry: ConversationEngine.run(session_id, user_id, message)
+- Intent Classification: AWARD_LOOKUP
+- Entity Resolution: award_event = award recieved by the
+- Routing: required=['kb_entity', 'web_search', 'wikipedia'], optional=['imdb', 'watchmode', 'wikipedia']
+- Governance: filter_tool_calls
+- Tool Calls Approved: 4
+- Tool Calls Rejected: 2
+- Prompt Build: build_prompt(...)
+- LLM Final Response: GroqClient.generate_response(prompt)
+- DB: store_message(role='user') + store_message(role='assistant')
+
+Cache:
+- Hits: none
+- Misses: similarity
+
+Tool Calls:
+- kb_entity: status=not_found, execution_time_ms=4717, args={'title': 'award recieved by the'}
+- web_search: status=success, execution_time_ms=4764, args={'query': 'award recieved by the film'}
+- wikipedia: status=not_found, execution_time_ms=4780, args={'title': 'award recieved by the'}
+- imdb: status=not_found, execution_time_ms=4780, args={'title': 'award recieved by the'}
+
+Response Mode: EXPLANATION_ONLY
+
+Exact Response:
+```json
+{
+  "text_response": "## Award Information\nGiven the context of your query, it seems like you're asking about a specific film's award, but without more details, I can provide general information on notable film awards.\n\n## Notable Film Awards\n* The Dadasaheb Phalke Award, introduced in 1969, is India's highest award in cinema, recognizing contributions of film personalities.\n* The National Film Awards are another prestigious set of awards that honor excellence in Indian cinema.\n\n## Limitations\nUnfortunately, without specific details about the film you're inquiring about, I can only offer general information. If you could provide more context or details about the film, such as its title or release year, I might be able to offer more targeted information.\n\n## Next Steps\nIf you're looking for information on a specific film's awards, consider providing:\n- The film's title\n- Its release year\n- Any other relevant details you might know\n\nThis would help in narrowing down the search and possibly finding the specific award information you're looking for.",
+  "poster_url": "",
+  "streaming": [],
+  "recommendations": [],
+  "download_link": "",
+  "sources": [
+    {
+      "title": "71st National Film Awards",
+      "link": "https://en.wikipedia.org/wiki/71st_National_Film_Awards"
+    },
+    {
+      "title": "National Film Awards, India (2025)",
+      "link": "https://www.imdb.com/event/ev0000467/2025/1/"
+    },
+    {
+      "title": "List of film awards",
+      "link": "https://en.wikipedia.org/wiki/List_of_film_awards"
+    },
+    {
+      "title": "71st National Film Awards for the year 2023 announced",
+      "link": "https://www.pib.gov.in/PressReleasePage.aspx?PRID=2151537"
+    },
+    {
+      "title": "Full List of National Film Awards 2025 Winners",
+      "link": "https://www.jagranjosh.com/general-knowledge/national-film-awards-winners-list-2025-1820001191-1"
+    }
+  ],
+  "response_mode": "EXPLANATION_ONLY"
+}
+```
+
+# LLM Backend Report
+
+## Run - 2026-03-06 05:02:04 UTC
+Query: "awards recieved by the film"
+
+Intent:
+- Primary: AWARD_LOOKUP (confidence: 85)
+
+Backend Flow:
+- API/Engine Entry: ConversationEngine.run(session_id, user_id, message)
+- Intent Classification: AWARD_LOOKUP
+- Entity Resolution: award_event = awards recieved by the
+- Routing: required=['kb_entity', 'web_search', 'wikipedia'], optional=['imdb', 'watchmode', 'wikipedia']
+- Governance: filter_tool_calls
+- Tool Calls Approved: 4
+- Tool Calls Rejected: 2
+- Prompt Build: build_prompt(...)
+- LLM Final Response: GroqClient.generate_response(prompt)
+- DB: store_message(role='user') + store_message(role='assistant')
+
+Cache:
+- Hits: none
+- Misses: similarity
+
+Tool Calls:
+- kb_entity: status=not_found, execution_time_ms=6514, args={'title': 'awards recieved by the'}
+- web_search: status=success, execution_time_ms=6514, args={'query': 'awards recieved by the film'}
+- wikipedia: status=not_found, execution_time_ms=6530, args={'title': 'awards recieved by the'}
+- imdb: status=not_found, execution_time_ms=6546, args={'title': 'awards recieved by the'}
+
+Response Mode: EXPLANATION_ONLY
+
+Exact Response:
+```json
+{
+  "text_response": "## Award Information\nGiven the lack of specific information about the film in question, I'll provide general details about notable awards in the Indian film industry. \n\n* The National Film Awards, established in 1954, recognize excellence in the Indian film industry, honoring artistic and technical merit.\n* These awards are a prestigious recognition of outstanding work in Indian cinema.\n\n## Limitations of Current Information\nSince no specific film or TOOL DATA regarding the film's awards is available, I recommend providing more details about the film, such as its title or release year, to get more accurate and personalized information about the awards it has received.\n\n## Next Steps\nIf you're looking for information on a specific film's awards, please provide the film's title or any other relevant details. This will help me give you a more precise answer, including any notable awards the film has won, such as those from the National Film Awards or other recognized Indian film award ceremonies.",
+  "poster_url": "",
+  "streaming": [],
+  "recommendations": [],
+  "download_link": "",
+  "sources": [
+    {
+      "title": "National Film Awards",
+      "link": "https://en.wikipedia.org/wiki/National_Film_Awards"
+    },
+    {
+      "title": "National Film Awards, India (2025)",
+      "link": "https://www.imdb.com/event/ev0000467/2025/1/"
+    },
+    {
+      "title": "List of film awards",
+      "link": "https://en.wikipedia.org/wiki/List_of_film_awards"
+    },
+    {
+      "title": "71st National Film Awards Winners List PDF: Category Wise",
+      "link": "https://guidely.in/blog/national-film-awards"
+    },
+    {
+      "title": "71st National Film Awards | History, Facts & Full Winners List ...",
+      "link": "https://www.youtube.com/watch?v=YZ3cu4qf9zw"
+    }
+  ],
+  "response_mode": "EXPLANATION_ONLY"
+}
+```
+
+# LLM Backend Report
+
+## Run - 2026-03-06 05:08:06 UTC
+Query: "who is stanley kubrick"
+
+Intent:
+- Primary: PERSON_LOOKUP (confidence: 95)
+- Entities: [person: Stanley Kubrick]
+
+Backend Flow:
+- API/Engine Entry: ConversationEngine.run(session_id, user_id, message)
+- Intent Classification: PERSON_LOOKUP
+- Entity Resolution: person = Stanley Kubrick
+- Routing: required=['kb_filmography'], optional=['imdb_person', 'web_search', 'wikipedia']
+- Governance: filter_tool_calls
+- Tool Calls Approved: 4
+- Prompt Build: build_prompt(...)
+- LLM Final Response: GroqClient.generate_response(prompt)
+- DB: store_message(role='user') + store_message(role='assistant')
+
+Cache:
+- Hits: none
+- Misses: similarity
+
+Tool Calls:
+- kb_filmography: status=success, execution_time_ms=7109, args={'name': 'Stanley Kubrick'}
+- imdb_person: status=success, execution_time_ms=7172, args={'name': 'Stanley Kubrick'}
+- web_search: status=success, execution_time_ms=7188, args={'query': 'who is stanley kubrick'}
+- wikipedia: status=success, execution_time_ms=7203, args={'title': 'Stanley Kubrick'}
+
+Response Mode: FULL_CARD
+
+Session Context:
+- After:  last_movie=None, last_person=Stanley Kubrick, last_entity=Stanley Kubrick, last_intent=PERSON_LOOKUP
+
+Exact Response:
+```json
+{
+  "text_response": "## Overview of Stanley Kubrick\nStanley Kubrick was a renowned American filmmaker and photographer, born on July 26, 1928, and passed away on March 7, 1999. He is widely regarded as one of the greatest and most influential filmmakers of all time.\n\n## Career Highlights\nKubrick's profession spanned multiple roles, including:\n* Writer\n* Director\n* Producer\nSome of his notable films include:\n* Eyes Wide Shut (1999)\n* Other films and documentaries, such as Kubrick by Kubrick (2020), Filmworker (2017), and Stanley Kubrick: A Life in Pictures (2001)\n\n## Filmography\nAccording to available data, Stanley Kubrick's filmography includes:\n* SK13: Kubrick's Endgame (2024)\n* A Clockwork Shining: Kubrick's Odyssey 3 (2024)\n* Kubrick by Kubrick (2020)\n* Filmworker (2017)\n* Ain't Misbehavin (2013)\n* Eyes Wide Shut (1999)\n* Stanley and Us (1999)\n* Stanley Kubrick: A Life in Pictures (2001)\n\n## Legacy\nAs a major figure in the post-war film industry, Kubrick's influence on cinema is still celebrated today. His work continues to inspire new generations of filmmakers and audiences alike.\n\nIf you're interested in exploring more of Stanley Kubrick's films or learning about his life and career, I'd be happy to provide recommendations or discuss his notable works in more detail.",
+  "poster_url": "https://image.tmdb.org/t/p/w500/yFT0VyIelI9aegZrsAwOG5iVP4v.jpg",
+  "streaming": [],
+  "recommendations": [],
+  "download_link": "",
+  "sources": [
+    {
+      "title": "Stanley Kubrick",
+      "link": "https://en.wikipedia.org/wiki/Stanley_Kubrick"
+    },
+    {
+      "title": "Stanley Kubrick(1928-1999)",
+      "link": "https://www.imdb.com/name/nm0000040/"
+    },
+    {
+      "title": "Stanley Kubrick | Biography, Movies, & Awards",
+      "link": "https://www.britannica.com/biography/Stanley-Kubrick"
+    },
+    {
+      "title": "Work and life of Stanley Kubrick",
+      "link": "https://kubrick.life/"
+    },
+    {
+      "title": "Stanley Kubrick | History | Research Starters",
+      "link": "https://www.ebsco.com/research-starters/history/stanley-kubrick"
+    }
+  ],
+  "response_mode": "FULL_CARD"
+}
+```
+
+# LLM Backend Report
+
+## Run - 2026-03-06 05:12:39 UTC
+Query: "who is stanley kubbrick"
+
+Intent:
+- Primary: PERSON_LOOKUP (confidence: 95)
+- Entities: [person: Stanley Kubrick]
+
+Backend Flow:
+- API/Engine Entry: ConversationEngine.run(session_id, user_id, message)
+- Intent Classification: PERSON_LOOKUP
+- Entity Resolution: person = Stanley Kubrick
+- Routing: required=['kb_filmography'], optional=['imdb_person', 'web_search', 'wikipedia']
+- Governance: filter_tool_calls
+- Tool Calls Approved (4): ['kb_filmography', 'imdb_person', 'web_search', 'wikipedia']
+- Prompt Build: build_prompt(...)
+- LLM Final Response: GroqClient.generate_response(prompt)
+- DB: store_message(role='user') + store_message(role='assistant')
+
+Cache:
+- Hits: none
+- Misses: similarity
+
+Tool Calls:
+- kb_filmography: status=success, execution_time_ms=7905, args={'name': 'Stanley Kubrick'}
+- imdb_person: status=success, execution_time_ms=7952, args={'name': 'Stanley Kubrick'}
+- web_search: status=success, execution_time_ms=7969, args={'query': 'who is stanley kubbrick'}
+- wikipedia: status=success, execution_time_ms=7983, args={'title': 'Stanley Kubrick'}
+
+Response Mode: FULL_CARD
+
+Session Context:
+- After:  last_movie=None, last_person=Stanley Kubrick, last_entity=Stanley Kubrick, last_intent=PERSON_LOOKUP
+
+Exact Response:
+```json
+{
+  "text_response": "## Overview of Stanley Kubrick\nStanley Kubrick was a renowned American filmmaker and photographer, widely regarded as one of the greatest and most influential figures in the post-war film industry. With a career spanning multiple decades, Kubrick left an indelible mark on the world of cinema.\n\n## Filmography Highlights\nSome notable films associated with Stanley Kubrick include:\n* Eyes Wide Shut (1999)\n* Other films and documentaries, such as Kubrick by Kubrick (2020), Filmworker (2017), and Stanley Kubrick: A Life in Pictures (2001), showcase his life and work\n\n## Profession and Legacy\nAs a director, writer, and producer, Kubrick's profession was deeply intertwined with his passion for storytelling and visual craftsmanship. His influence can still be seen in many aspects of the film industry today.\n\n## Additional Information\nWhile the provided tool data offers a glimpse into Kubrick's filmography and profession, more detailed information about his life, inspirations, and creative process can be found through various biographies, interviews, and analyses of his work. If you're interested in exploring more about Stanley Kubrick, I can suggest some recommendations for films, books, or documentaries that might be of interest to you.",
+  "poster_url": "https://image.tmdb.org/t/p/w500/yFT0VyIelI9aegZrsAwOG5iVP4v.jpg",
+  "streaming": [],
+  "recommendations": [],
+  "download_link": "",
+  "sources": [
+    {
+      "title": "Stanley Kubrick",
+      "link": "https://en.wikipedia.org/wiki/Stanley_Kubrick"
+    },
+    {
+      "title": "Stanley Kubrick(1928-1999)",
+      "link": "https://www.imdb.com/name/nm0000040/"
+    },
+    {
+      "title": "Stanley Kubrick | Biography, Movies, & Awards",
+      "link": "https://www.britannica.com/biography/Stanley-Kubrick"
+    },
+    {
+      "title": "Work and life of Stanley Kubrick",
+      "link": "https://kubrick.life/"
+    },
+    {
+      "title": "Stanley Kubrick: The Ultimate Guide to the Legendary ...",
+      "link": "https://indiefilmhustle.com/stanley-kubrick/"
+    }
+  ],
+  "response_mode": "FULL_CARD"
+}
+```
+
+# LLM Backend Report
+
+## Run - 2026-03-06 05:37:47 UTC
+Query: "who is stanley kubrick"
+
+Intent:
+- Primary: PERSON_LOOKUP (confidence: 95)
+- Entities: [person: Stanley Kubrick]
+
+Backend Flow:
+- API/Engine Entry: ConversationEngine.run(session_id, user_id, message)
+- Intent Classification: PERSON_LOOKUP
+- Entity Resolution: person = Stanley Kubrick
+- Routing: required=['kb_filmography'], optional=['imdb_person', 'web_search', 'wikipedia']
+- Governance: filter_tool_calls
+- Tool Calls Approved (4): ['kb_filmography', 'imdb_person', 'web_search', 'wikipedia']
+- Prompt Build: build_prompt(...)
+- LLM Final Response: GroqClient.generate_response(prompt)
+- DB: store_message(role='user') + store_message(role='assistant')
+
+Cache:
+- Hits: none
+- Misses: similarity
+
+Tool Calls:
+- kb_filmography: status=success, execution_time_ms=6890, args={'name': 'Stanley Kubrick'}
+- imdb_person: status=success, execution_time_ms=6953, args={'name': 'Stanley Kubrick'}
+- web_search: status=success, execution_time_ms=6967, args={'query': 'who is stanley kubrick'}
+- wikipedia: status=success, execution_time_ms=6984, args={'title': 'Stanley Kubrick'}
+
+Response Mode: FULL_CARD
+
+Session Context:
+- Before: last_movie=None, last_person=Stanley Kubrick, last_entity=Stanley Kubrick, last_intent=PERSON_LOOKUP
+- After:  last_movie=None, last_person=Stanley Kubrick, last_entity=Stanley Kubrick, last_intent=PERSON_LOOKUP
+
+Exact Response:
+```json
+{
+  "text_response": "Stanley Kubrick is a highly acclaimed American filmmaker and photographer, widely regarded as one of the greatest and most influential directors in the history of cinema. With a career spanning over four decades, Kubrick has left an indelible mark on the film industry.\n\n### Filmography Highlights\nSome of his most notable works include:\n* **2001: A Space Odyssey** (1968, rating: 8.3) - a groundbreaking science fiction film\n* **A Clockwork Orange** (1971, rating: 8.2) - a dystopian satire\n* **The Shining** (1980, rating: 8.4) - a horror classic\n* **Full Metal Jacket** (1987, rating: 8.2) - a war drama\n* **Eyes Wide Shut** (1999, rating: 7.5) - a psychological drama\n\n### Career and Legacy\nKubrick's films are known for their meticulous attention to detail, visual grandeur, and thought-provoking themes. He has worked with some of the most talented actors and writers in the industry, and his collaborations have resulted in some of the most iconic films of all time.\n\n### Awards and Recognition\nThroughout his career, Kubrick has received numerous awards and nominations for his work, including several Academy Award nominations. His films continue to be celebrated and studied by audiences and filmmakers around the world.\n\n### Personal Life and Interests\nWhile Kubrick's personal life was somewhat private, his passion for photography and filmmaking is well-documented. He was known for his perfectionism and attention to detail, which often resulted in lengthy production schedules and exacting standards for his cast and crew.\n\nIf you're interested in learning more about Stanley Kubrick's life and work, I can recommend some of his films or provide more information on his career and legacy. What would you like to know?",
+  "poster_url": "https://image.tmdb.org/t/p/w500/yFT0VyIelI9aegZrsAwOG5iVP4v.jpg",
+  "streaming": [],
+  "recommendations": [],
+  "download_link": "",
+  "sources": [
+    {
+      "title": "Stanley Kubrick",
+      "link": "https://en.wikipedia.org/wiki/Stanley_Kubrick"
+    },
+    {
+      "title": "Stanley Kubrick(1928-1999)",
+      "link": "https://www.imdb.com/name/nm0000040/"
+    },
+    {
+      "title": "Stanley Kubrick | Biography, Movies, & Awards",
+      "link": "https://www.britannica.com/biography/Stanley-Kubrick"
+    },
+    {
+      "title": "Work and life of Stanley Kubrick",
+      "link": "https://kubrick.life/"
+    },
+    {
+      "title": "Stanley Kubrick redefined: recent research challenges ...",
+      "link": "https://theconversation.com/stanley-kubrick-redefined-recent-research-challenges-myths-to-reveal-the-man-behind-the-legend-223933"
+    }
+  ],
+  "response_mode": "FULL_CARD"
+}
+```
+
+# LLM Backend Report
+
+## Run - 2026-03-06 06:14:57 UTC
+Query: "about 2001 space odyssey"
+
+Intent:
+- Primary: ENTITY_LOOKUP (confidence: 95)
+- Entities: [movie: 2001: A Space Odyssey]
+
+Backend Flow:
+- API/Engine Entry: ConversationEngine.run(session_id, user_id, message)
+- Intent Classification: ENTITY_LOOKUP
+- Entity Resolution: movie = 2001: A Space Odyssey
+- Routing: required=['kb_entity'], optional=['imdb', 'watchmode', 'wikipedia']
+- Governance: filter_tool_calls
+- Tool Calls Approved (4): ['kb_entity', 'imdb', 'watchmode', 'wikipedia']
+- Prompt Build: build_prompt(...)
+- LLM Final Response: GroqClient.generate_response(prompt)
+- DB: store_message(role='user') + store_message(role='assistant')
+
+Cache:
+- Hits: imdb, wikipedia
+- Misses: similarity
+
+Tool Calls:
+- kb_entity: status=success, execution_time_ms=3671, args={'title': '2001: A Space Odyssey'}
+- watchmode: status=success, execution_time_ms=3733, args={'title': '2001: A Space Odyssey', 'region': 'IN'}
+
+Response Mode: FULL_CARD
+
+Session Context:
+- After:  last_movie=2001: A Space Odyssey, last_person=None, last_entity=2001: A Space Odyssey, last_intent=ENTITY_LOOKUP
+
+Exact Response:
+```json
+{
+  "text_response": "## Overview of 2001: A Space Odyssey\n2001: A Space Odyssey is a seminal film in the science fiction genre, directed by the acclaimed Stanley Kubrick. Released in 1968, it has garnered widespread critical acclaim for its thematic depth, visual effects, and philosophical undertones. With a rating of 8.1 on IMDb from over 12,381 votes, and an 8.3 rating from other sources, it's clear that this film has stood the test of time.\n\n## Plot and Themes\nThe plot revolves around the discovery of a mysterious object buried beneath the lunar surface, which prompts a mission to uncover its origins. This journey is aided by HAL 9000, the world's most advanced supercomputer, played by Douglas Rain. The film explores themes of human evolution, technology, and existentialism, raising questions about the nature of intelligence, consciousness, and the future of humanity.\n\n## Cast and Crew\n- **Director:** Stanley Kubrick\n- **Cast:** Keir Dullea, Gary Lockwood, William Sylvester, Douglas Rain, Daniel Richter\n- **Genres:** Science Fiction, Mystery, Adventure\n\n## Availability\nFor those interested in watching 2001: A Space Odyssey, it is available to stream on various platforms, including:\n* AppleTV\n* Amazon\n* YouTube\n\n## Behind the Scenes\nThe film was co-written by Kubrick and Arthur C. Clarke, with its plot inspired by several of Clarke's works. The collaboration between Kubrick and Clarke resulted in a unique blend of cinematic and literary genius, contributing to the film's enduring legacy.\n\n## Legacy and Impact\n2001: A Space Odyssey has had a profound impact on the science fiction genre and cinema as a whole. Its influence can be seen in many subsequent films, TV shows, and even music. The film's slow pace, coupled with its profound themes and groundbreaking visual effects, has made it a subject of study and admiration for decades.\n\nIf you're a fan of science fiction, philosophy, or simply great storytelling, 2001: A Space Odyssey is a must-watch. Its exploration of human existence and the potential future of technology and space exploration continues to captivate audiences today.",
+  "poster_url": "https://image.tmdb.org/t/p/w500/ve72VxNqjGM69Uky4WTo2bK6rfq.jpg",
+  "streaming": [
+    "AppleTV",
+    "Amazon",
+    "YouTube"
+  ],
+  "recommendations": [],
+  "download_link": "",
+  "sources": [],
+  "response_mode": "FULL_CARD"
+}
+```
+
+# LLM Backend Report
+
+## Run - 2026-03-06 07:43:19 UTC
+Query: "about intersteller"
+
+Intent:
+- Primary: ENTITY_LOOKUP (confidence: 95)
+- Entities: [movie: Interstellar]
+
+Backend Flow:
+- API/Engine Entry: ConversationEngine.run(session_id, user_id, message)
+- Intent Classification: ENTITY_LOOKUP
+- Entity Resolution: movie = Interstellar
+- Routing: required=['kb_entity'], optional=['imdb', 'watchmode', 'wikipedia']
+- Governance: filter_tool_calls
+- Tool Calls Approved (4): ['kb_entity', 'imdb', 'watchmode', 'wikipedia']
+- Prompt Build: build_prompt(...)
+- LLM Final Response: GroqClient.generate_response(prompt)
+- DB: store_message(role='user') + store_message(role='assistant')
+
+Cache:
+- Hits: none
+- Misses: similarity
+
+Tool Calls:
+- kb_entity: status=success, execution_time_ms=3327, args={'title': 'Interstellar'}
+- imdb: status=success, execution_time_ms=3343, args={'title': 'Interstellar'}
+- watchmode: status=success, execution_time_ms=3359, args={'title': 'Interstellar', 'region': 'IN'}
+- wikipedia: status=success, execution_time_ms=3375, args={'title': 'Interstellar'}
+
+Response Mode: FULL_CARD
+
+Session Context:
+- Before: last_movie=2001: A Space Odyssey, last_person=None, last_entity=2001: A Space Odyssey, last_intent=ENTITY_LOOKUP
+- After:  last_movie=Interstellar, last_person=None, last_entity=Interstellar, last_intent=ENTITY_LOOKUP
+
+Exact Response:
+```json
+{
+  "text_response": "## Movie Overview\nInterstellar is a 2014 science fiction film that delves into the adventures of a group of explorers who embark on an interstellar voyage. With a wormhole newly discovered, they aim to surpass the limitations of human space travel and conquer the vast distances involved. The movie has garnered significant attention for its thought-provoking themes and stunning visual effects.\n\n## Ratings and Reception\nInterstellar has received high praise from critics and audiences alike, with an impressive rating of 8.7 from one source and 8.5 from IMDb, based on 39,034 votes. This indicates a wide acceptance and appreciation of the film's narrative, direction, and overall cinematic experience.\n\n## Cast and Crew\nThe film boasts a talented cast, including Matthew McConaughey, Anne Hathaway, Michael Caine, Jessica Chastain, and Casey Affleck. Under the direction of the acclaimed Christopher Nolan, the cast delivers powerful performances that bring depth and emotion to the story.\n\n## Streaming Options\nFor those interested in watching Interstellar, it is available on various platforms, including:\n* Hotstar\n* Prime Video\n* AppleTV\n* Amazon\n* YouTube\n\n## Additional Information\nWhile the provided tool data offers a comprehensive overview of the movie, including its plot, ratings, and streaming options, further details about the film's production, themes, and impact can be found on platforms like Wikipedia, which might offer more in-depth summaries and analyses.\n\nIf you're considering watching Interstellar, I highly recommend it for its engaging storyline, impressive visuals, and the philosophical questions it raises about space, time, and human existence. Would you like more information on the film's themes, production, or perhaps recommendations for similar movies?",
+  "poster_url": "https://image.tmdb.org/t/p/w500/gEU2QniE6E77NI6lCU6MxlNBvIx.jpg",
+  "streaming": [
+    "Hotstar",
+    "Prime Video",
+    "AppleTV",
+    "Amazon",
+    "YouTube"
+  ],
+  "recommendations": [],
+  "download_link": "",
+  "sources": [],
+  "response_mode": "FULL_CARD"
+}
+```
+
+# LLM Backend Report
+
+## Run - 2026-03-06 07:44:00 UTC
+Query: "similarity b/w both"
+
+Intent:
+- Primary: MOVIE_SIMILARITY (confidence: 80)
+
+Backend Flow:
+- API/Engine Entry: ConversationEngine.run(session_id, user_id, message)
+- Intent Classification: MOVIE_SIMILARITY
+- Entity Resolution: movie = similarity b/w both
+- Routing: required=['kb_similarity'], optional=['similarity']
+- Governance: filter_tool_calls
+- Tool Calls Approved (2): ['kb_similarity', 'similarity']
+- Prompt Build: build_prompt(...)
+- LLM Final Response: GroqClient.generate_response(prompt)
+- DB: store_message(role='user') + store_message(role='assistant')
+
+Cache:
+- Hits: none
+- Misses: similarity
+
+Tool Calls:
+- kb_similarity: status=not_found, execution_time_ms=0, args={'title': 'similarity b/w both'}
+
+Response Mode: RECOMMENDATION_GRID
+
+Session Context:
+- Before: last_movie=Interstellar, last_person=None, last_entity=Interstellar, last_intent=ENTITY_LOOKUP
+- After:  last_movie=None, last_person=None, last_entity=similarity b/w both, last_intent=MOVIE_SIMILARITY
+
+Exact Response:
+```json
+{
+  "text_response": "## Similarity Analysis\nUnfortunately, the tool data indicates that the similarity status is \"not_found\" for both the standard similarity check and the knowledge base similarity check. \n\n## Key Points to Consider\n* The similarity check did not yield any results, as indicated by the \"status=not_found\" in the tool data.\n* The knowledge base similarity check also did not find any relevant information, with the same \"status=not_found\" status.\n* Without more specific details or live data, it's challenging to provide a more accurate analysis of the similarity between the two entities in question.\n\n## Next Steps\nIf you could provide more context or details about the entities you're comparing, I'd be happy to try and help you explore their similarities. Alternatively, if live data or more specific tool data becomes available, we may be able to conduct a more in-depth analysis. \n\n## Available Assistance\nI'm here to help with any movie-related queries, including:\n* Film recommendations based on your preferences\n* Information about specific movies, including ratings and streaming options\n* General discussions about cinema and film genres\n\nPlease feel free to ask, and I'll do my best to assist you!",
+  "poster_url": "",
+  "streaming": [],
+  "recommendations": [],
+  "download_link": "",
+  "sources": [],
+  "response_mode": "RECOMMENDATION_GRID"
+}
+```
+
+# LLM Backend Report
+
+## Run - 2026-03-06 07:44:43 UTC
+Query: "overvie of his films"
+Resolved: "overvie of his films (refers to Stanley Kubrick)"
+
+Intent:
+- Primary: FILMOGRAPHY (confidence: 95)
+- Entities: [person: Stanley Kubrick]
+
+Backend Flow:
+- API/Engine Entry: ConversationEngine.run(session_id, user_id, message)
+- Intent Classification: FILMOGRAPHY
+- Entity Resolution: person = Stanley Kubrick
+- Routing: required=['kb_filmography'], optional=['imdb_person', 'wikipedia']
+- Governance: filter_tool_calls
+- Tool Calls Approved (3): ['kb_filmography', 'imdb_person', 'wikipedia']
+- Prompt Build: build_prompt(...)
+- LLM Final Response: GroqClient.generate_response(prompt)
+- DB: store_message(role='user') + store_message(role='assistant')
+
+Cache:
+- Hits: none
+- Misses: similarity
+
+Tool Calls:
+- kb_filmography: status=success, execution_time_ms=4000, args={'name': 'Stanley Kubrick'}
+- imdb_person: status=success, execution_time_ms=4000, args={'name': 'Stanley Kubrick'}
+- wikipedia: status=success, execution_time_ms=4015, args={'title': 'Stanley Kubrick'}
+
+Response Mode: FILMOGRAPHY_LIST
+
+Session Context:
+- Before: last_movie=None, last_person=Stanley Kubrick, last_entity=Stanley Kubrick, last_intent=PERSON_LOOKUP
+- After:  last_movie=None, last_person=Stanley Kubrick, last_entity=Stanley Kubrick, last_intent=FILMOGRAPHY
+
+Exact Response:
+```json
+{
+  "text_response": "## Overview of Stanley Kubrick's Films\n\nStanley Kubrick, a renowned American filmmaker and photographer, has left an indelible mark on the world of cinema. With a career spanning over four decades, Kubrick has directed a diverse range of films that showcase his unique style and attention to detail. Here's an overview of some of his notable works:\n\n### Directed Films\n\n* **Eyes Wide Shut (1999, rating=7.5)**: A psychological drama that explores the complexities of marriage and relationships.\n* **Full Metal Jacket (1987, rating=8.2)**: A war drama that delves into the psychological effects of military training on young recruits.\n* **The Shining (1980, rating=8.4)**: A horror classic that tells the story of a family's descent into madness while isolated in a haunted hotel.\n* **Barry Lyndon (1975, rating=8.1)**: A period drama that follows the rise and fall of a young man's fortunes in 18th-century England.\n* **A Clockwork Orange (1971, rating=8.2)**: A dystopian satire that explores the themes of violence, free will, and societal conditioning.\n* **2001: A Space Odyssey (1968, rating=8.3)**: A groundbreaking science fiction film that explores human evolution, technology, and extraterrestrial life.\n* **Dr. Strangelove or: How I Learned to Stop Worrying and Love the Bomb (1964, rating=8.3)**: A black comedy that satirizes the Cold War and the threat of nuclear war.\n* **Lolita (1962, rating=7.5)**: A psychological drama that explores the complex and controversial themes of obsession and desire.\n* **Spartacus (1960, rating=7.9)**: A historical epic that tells the story of a slave uprising in ancient Rome.\n* **Paths of Glory (1957, rating=8.4)**: A war drama that explores the themes of honor, duty, and the psychological effects of war.\n* **The Killing (1956, rating=7.9)**: A crime thriller that follows a group of small-time crooks as they plan and execute a heist.\n* **Killer's Kiss (1955, rating=6.5)**: A film noir that explores the darker side of human nature.\n* **Fear and Desire (1952, rating=5.3)**: A war drama that explores the psychological effects of war on a group of soldiers.\n\n### Other Notable Works\n\nKubrick has also been involved in various other projects, including:\n* **Shooting 'Full Metal Jacket' (1986, rating=7.7)**: A documentary that explores the making of Full Metal Jacket.\n* **Lunatic at Large**: An unproduced screenplay that Kubrick worked on in the 1950s.\n* **Honor**: An unproduced screenplay that Kubrick worked on in the 1950s.\n* **Aryan Papers**: An unproduced screenplay that Kubrick worked on in the 1990s.\n\n## Legacy and Influence\n\nStanley Kubrick's films continue to be widely acclaimed and influential, with many of his works being regarded as classics of world cinema. His unique style, attention to detail, and exploration of complex themes have inspired generations of filmmakers and audiences alike.",
+  "poster_url": "https://image.tmdb.org/t/p/w500/yFT0VyIelI9aegZrsAwOG5iVP4v.jpg",
+  "streaming": [],
+  "recommendations": [],
+  "download_link": "",
+  "sources": [],
+  "response_mode": "FILMOGRAPHY_LIST"
+}
+```
+
+# LLM Backend Report
+
+## Run - 2026-03-06 07:45:42 UTC
+Query: "similarity between 2001 and intersteller"
+
+Intent:
+- Primary: COMPARISON (confidence: 90)
+- Entities: [movie: 2001, movie: Interstellar]
+
+Backend Flow:
+- API/Engine Entry: ConversationEngine.run(session_id, user_id, message)
+- Intent Classification: COMPARISON
+- Entity Resolution: movie = 2001
+- Routing: required=['kb_comparison', 'kb_similarity'], optional=['similarity', 'web_search']
+- Governance: filter_tool_calls
+- Tool Calls Approved (4): ['kb_comparison', 'kb_similarity', 'similarity', 'web_search']
+- Prompt Build: build_prompt(...)
+- LLM Final Response: GroqClient.generate_response(prompt)
+- DB: store_message(role='user') + store_message(role='assistant')
+
+Cache:
+- Hits: none
+- Misses: similarity
+
+Tool Calls:
+- kb_comparison: status=success, execution_time_ms=2500, args={'title_a': '2001', 'title_b': 'Interstellar'}
+- kb_similarity: status=not_found, execution_time_ms=2515, args={'title': '2001'}
+- web_search: status=success, execution_time_ms=2531, args={'query': 'similarity between 2001 and intersteller'}
+
+Response Mode: COMPARISON_TABLE
+
+Session Context:
+- Before: last_movie=None, last_person=None, last_entity=similarity b/w both, last_intent=MOVIE_SIMILARITY
+- After:  last_movie=None, last_person=None, last_entity=2001, last_intent=COMPARISON
+
+Exact Response:
+```json
+{
+  "text_response": "## Comparing Two Space Odyssey Classics\nTo explore the similarity between 2001: A Space Odyssey and Interstellar, let's dive into what we know about these films. \n\n### Film Details\n- **2001: A Space Odyssey**: Unfortunately, we don't have specific details like the rating or release year in our current data, but it's widely recognized as a seminal work in science fiction cinema.\n- **Interstellar (2014)**: This film has a rating of 8.7, indicating a high level of acclaim.\n\n### Conceptual Similarities\nBoth films delve into complex themes such as space exploration, human evolution, and the mysteries of the universe. They challenge viewers to ponder the existential questions about our place in the cosmos and the future of humanity.\n\n### Viewer Perspectives\nFrom the available feedback, it's clear that both movies have a profound impact on their audiences, albeit in different ways. One viewer noted that **Interstellar** evokes more emotion, while **2001: A Space Odyssey** prompts more introspection and leaves viewers with numerous questions about the story and its concepts.\n\n### Analytical Comparison\nWhile direct comparison data is not available, we can infer from the themes and viewer responses that both films are masterpieces in their own right, contributing uniquely to the science fiction genre. **2001: A Space Odyssey** is often credited with its influential and enigmatic portrayal of space and human destiny, whereas **Interstellar** explores the possibilities of wormhole travel and the search for a new home for humanity.\n\n### Recommendations\nIf you enjoyed the profound and visually stunning experience of **Interstellar**, you might appreciate the thought-provoking and groundbreaking **2001: A Space Odyssey**. Conversely, fans of **2001: A Space Odyssey** might find **Interstellar**'s blend of emotion, science, and spectacular visuals compelling.\n\nGiven the lack of direct comparison data, live tool data could provide more nuanced insights into the similarities and differences between these two cinematic gems. Nonetheless, both films are must-watches for anyone interested in science fiction, space exploration, and philosophical cinema.",
+  "poster_url": "",
+  "streaming": [],
+  "recommendations": [],
+  "download_link": "",
+  "sources": [
+    {
+      "title": "Interstellar vs. 2001: A Space Odyssey : r/movies",
+      "link": "https://www.reddit.com/r/movies/comments/9mc6y6/interstellar_vs_2001_a_space_odyssey/"
+    },
+    {
+      "title": "Are there parallels between 2001 and Interstellar?",
+      "link": "https://www.facebook.com/groups/48110631372/posts/10160567936241373/"
+    },
+    {
+      "title": "Was Interstellar too similar to 2001 A Space Odyssey?",
+      "link": "https://www.quora.com/Was-Interstellar-too-similar-to-2001-A-Space-Odyssey"
+    },
+    {
+      "title": "Interstellar v 2001: A Space Odyssey: worlds apart or on ...",
+      "link": "https://www.theguardian.com/film/filmblog/2014/nov/10/interstellar-2001-a-space-odyssey-christoper-nolan-kubrick"
+    },
+    {
+      "title": "Interstellar vs. 2001 — A Question and an Answer",
+      "link": "https://www.youtube.com/watch?v=FAsU9VJXkY0"
+    }
+  ],
+  "response_mode": "COMPARISON_TABLE"
+}
+```
+
+# LLM Backend Report
+
+## Run - 2026-03-06 07:46:42 UTC
+Query: "What are the current trending movies in India in 2026?"
+
+Intent:
+- Primary: TRENDING (confidence: 95)
+- Entities: [year: 2026]
+
+Backend Flow:
+- API/Engine Entry: ConversationEngine.run(session_id, user_id, message)
+- Intent Classification: TRENDING
+- Entity Resolution: catalog = 2026
+- Routing: required=['imdb_trending_tamil', 'web_search'], optional=[]
+- Governance: filter_tool_calls
+- Tool Calls Approved (2): ['imdb_trending_tamil', 'web_search']
+- Prompt Build: build_prompt(...)
+- LLM Final Response: GroqClient.generate_response(prompt)
+- DB: store_message(role='user') + store_message(role='assistant')
+
+Cache:
+- Hits: none
+- Misses: none
+
+Tool Calls:
+- imdb_trending_tamil: status=error, execution_time_ms=3077, args={}
+- web_search: status=success, execution_time_ms=3093, args={'query': 'What are the current trending movies in India in 2026?'}
+
+Response Mode: RECOMMENDATION_GRID
+
+Session Context:
+- Before: last_movie=None, last_person=None, last_entity=2001, last_intent=COMPARISON
+- After:  last_movie=None, last_person=None, last_entity=2026, last_intent=TRENDING
+
+Exact Response:
+```json
+{
+  "text_response": "## Current Trending Movies in India 2026\nUnfortunately, the IMDb trending Tamil movies data is currently unavailable due to an error. However, based on the available information, here are some upcoming movies in 2026:\n\n* Jana Nayagan (released on January 9)\n* The Raja Saab (released on January 9)\n* Happy Patel: Khatarnak Jasoos (released on January 16)\n* Border 2 (released on January 23)\n* O' Romeo (released on February 13)\n* Dhurandhar: The Revenge (2026) - release date not specified\n\nPlease note that the list above might not reflect the current trending movies, as the data is limited to upcoming releases and does not account for their popularity or ratings. For more accurate and up-to-date information, I recommend checking a reliable source or waiting for the IMDb trending data to become available.\n\nIf you're looking for personalized movie recommendations or more information on a specific movie, feel free to share your preferences or ask, and I'll do my best to assist you.",
+  "poster_url": "",
+  "streaming": [],
+  "recommendations": [],
+  "download_link": "",
+  "sources": [
+    {
+      "title": "27 Indian movies of 2026 that everyone will be talking ...",
+      "link": "https://www.vogue.in/content/indian-movies-of-2026-that-everyone-will-be-talking-about"
+    },
+    {
+      "title": "Most anticipated new Indian movies and shows",
+      "link": "https://www.imdb.com/india/upcoming/"
+    },
+    {
+      "title": "26 Most Hyped Indian Movies of 2026",
+      "link": "https://www.youtube.com/watch?v=iz5Q7BKMooY"
+    },
+    {
+      "title": "List of Indian films of 2026",
+      "link": "https://en.wikipedia.org/wiki/List_of_Indian_films_of_2026"
+    },
+    {
+      "title": "The Biggest Indian Films of 2026: From 'Toxic' and ' ...",
+      "link": "https://www.hollywoodreporterindia.com/features/columns/the-biggest-indian-films-of-2026-from-toxic-and-ramayana-part-1-to-king"
+    }
+  ],
+  "response_mode": "RECOMMENDATION_GRID"
+}
+```
+
+# LLM Backend Report
+
+## Run - 2026-03-06 07:46:44 UTC
+Query: "What are the current trending movies in India in 2026?"
+
+Intent:
+- Primary: TRENDING (confidence: 95)
+- Entities: [year: 2026]
+
+Backend Flow:
+- API/Engine Entry: ConversationEngine.run(session_id, user_id, message)
+- Intent Classification: TRENDING
+- Entity Resolution: catalog = 2026
+- Routing: required=['imdb_trending_tamil', 'web_search'], optional=[]
+- Governance: filter_tool_calls
+- Tool Calls Approved (2): ['imdb_trending_tamil', 'web_search']
+- Prompt Build: build_prompt(...)
+- LLM Final Response: GroqClient.generate_response(prompt)
+- DB: store_message(role='user') + store_message(role='assistant')
+
+Cache:
+- Hits: none
+- Misses: none
+
+Tool Calls:
+- imdb_trending_tamil: status=error, execution_time_ms=3515, args={}
+- web_search: status=success, execution_time_ms=3531, args={'query': 'What are the current trending movies in India in 2026?'}
+
+Response Mode: RECOMMENDATION_GRID
+
+Session Context:
+- Before: last_movie=None, last_person=None, last_entity=2001, last_intent=COMPARISON
+- After:  last_movie=None, last_person=None, last_entity=2026, last_intent=TRENDING
+
+Exact Response:
+```json
+{
+  "text_response": "## Current Trending Movies in India 2026\nUnfortunately, the current trending Tamil movies on IMDB are not available due to an error. However, based on the available data, here are some upcoming movies in 2026:\n* Dhurandhar: The Revenge (2026) featuring Meenakshi Dinesh, Nash, Karuppiah C Ram, G.V. Prakash Kumar, Viki, and Sulochana\n* Bhooth Bangla (2026) starring Akshay Kumar\n* Charak (2026)\n\n## Alternative Sources\nSince the IMDB trending data is not available, we can look into other sources for the current trending movies in India. However, the provided data only includes information about upcoming movies in 2026.\n\n## Recommendations\nIf you're looking for movie recommendations, I can suggest some popular genres or help you find movies based on your favorite actors or directors. Please let me know your preferences, and I'll do my best to provide personalized recommendations.\n\n## Future Updates\nFor more accurate and up-to-date information, I recommend checking the official IMDB website or other reliable sources for the latest trending movies in India. If you have any specific questions or need further assistance, feel free to ask!",
+  "poster_url": "",
+  "streaming": [],
+  "recommendations": [],
+  "download_link": "",
+  "sources": [
+    {
+      "title": "Most anticipated new Indian movies and shows",
+      "link": "https://www.imdb.com/india/upcoming/"
+    },
+    {
+      "title": "26 Most Hyped Indian Movies of 2026",
+      "link": "https://www.youtube.com/watch?v=iz5Q7BKMooY"
+    },
+    {
+      "title": "27 Indian movies of 2026 that everyone will be talking ...",
+      "link": "https://www.vogue.in/content/indian-movies-of-2026-that-everyone-will-be-talking-about"
+    },
+    {
+      "title": "List of Indian films of 2026",
+      "link": "https://en.wikipedia.org/wiki/List_of_Indian_films_of_2026"
+    },
+    {
+      "title": "The Biggest Indian Films of 2026: From 'Toxic' and ' ...",
+      "link": "https://www.hollywoodreporterindia.com/features/columns/the-biggest-indian-films-of-2026-from-toxic-and-ramayana-part-1-to-king"
+    }
+  ],
+  "response_mode": "RECOMMENDATION_GRID"
+}
+```
+

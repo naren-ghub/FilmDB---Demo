@@ -2,16 +2,63 @@ from typing import Any
 
 
 ROUTING_MATRIX: dict[str, dict[str, list[str]]] = {
+    # ── KB-first routes (local data primary, API fallback) ───────────────
     "ENTITY_LOOKUP": {
-        "required": ["imdb"],
-        "optional": ["wikipedia", "watchmode"],
+        "required": ["kb_entity"],
+        "optional": ["imdb", "wikipedia", "watchmode"],
         "forbidden": ["archive"],
     },
     "ANALYTICAL_EXPLANATION": {
-        "required": ["imdb", "wikipedia"],
+        "required": ["kb_entity", "kb_plot"],
+        "optional": ["wikipedia", "web_search"],
+        "forbidden": ["archive"],
+    },
+    "PLOT_EXPLANATION": {
+        "required": ["kb_plot"],
+        "optional": ["kb_entity", "wikipedia"],
+        "forbidden": [],
+    },
+    "CRITIC_SUMMARY": {
+        "required": ["kb_critic"],
+        "optional": ["kb_entity", "rt_reviews", "web_search"],
+        "forbidden": [],
+    },
+    "MOVIE_SIMILARITY": {
+        "required": ["kb_similarity"],
+        "optional": ["similarity"],
+        "forbidden": [],
+    },
+    "RECOMMENDATION": {
+        "required": ["kb_similarity"],
+        "optional": ["similarity", "web_search"],
+        "forbidden": [],
+    },
+    "REVIEWS": {
+        "required": ["kb_critic"],
+        "optional": ["rt_reviews", "web_search"],
+        "forbidden": [],
+    },
+    "TOP_RATED": {
+        "required": ["kb_top_rated"],
+        "optional": ["imdb_top_rated_english"],
+        "forbidden": [],
+    },
+    "COMPARISON": {
+        "required": ["kb_comparison"],
         "optional": ["web_search"],
         "forbidden": ["archive"],
     },
+    "FILMOGRAPHY": {
+        "required": ["kb_filmography"],
+        "optional": ["imdb_person", "wikipedia"],
+        "forbidden": [],
+    },
+    "PERSON_LOOKUP": {
+        "required": ["kb_filmography"],
+        "optional": ["imdb_person", "wikipedia", "web_search"],
+        "forbidden": [],
+    },
+    # ── API-first routes (live data required) ────────────────────────────
     "AVAILABILITY": {
         "required": ["watchmode"],
         "optional": ["web_search"],
@@ -20,11 +67,6 @@ ROUTING_MATRIX: dict[str, dict[str, list[str]]] = {
     "STREAMING_AVAILABILITY": {
         "required": ["watchmode"],
         "optional": ["web_search"],
-        "forbidden": [],
-    },
-    "RECOMMENDATION": {
-        "required": ["similarity"],
-        "optional": ["imdb", "web_search"],
         "forbidden": [],
     },
     "DOWNLOAD": {
@@ -42,13 +84,8 @@ ROUTING_MATRIX: dict[str, dict[str, list[str]]] = {
         "optional": [],
         "forbidden": ["archive"],
     },
-    "REVIEWS": {
-        "required": ["rt_reviews"],
-        "optional": ["imdb", "web_search", "wikipedia"],
-        "forbidden": [],
-    },
     "TRENDING": {
-        "required": ["imdb_trending_tamil", "web_search"],
+        "required": ["web_search", "imdb_trending_tamil"],
         "optional": [],
         "forbidden": [],
     },
@@ -63,31 +100,16 @@ ROUTING_MATRIX: dict[str, dict[str, list[str]]] = {
         "forbidden": [],
     },
     "AWARD_LOOKUP": {
-        "required": ["wikipedia,web_search"],
+        "required": ["wikipedia", "web_search"],
         "optional": ["imdb"],
         "forbidden": ["archive"],
-    },
-    "TOP_RATED": {
-        "required": ["imdb_top_rated_english"],
-        "optional": ["web_search"],
-        "forbidden": [],
     },
     "STREAMING_DISCOVERY": {
         "required": ["web_search"],
         "optional": [],
         "forbidden": [],
     },
-    "PERSON_LOOKUP": {
-        "required": ["imdb_person", "wikipedia"],
-        "optional": ["web_search"],
-        "forbidden": [],
-    },
-    "COMPARISON": {
-        "required": ["web_search"],
-        "optional": ["imdb", "wikipedia"],
-        "forbidden": ["archive"],
-    },
-    # ── New intents ──
+    # ── Non-tool intents ─────────────────────────────────────────────────
     "GREETING": {
         "required": [],
         "optional": [],

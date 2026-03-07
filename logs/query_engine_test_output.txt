@@ -1,0 +1,49 @@
+=== Test 1: Title resolution ===
+  Inception -> tt1375666
+  The Dark Knight -> tt0468569
+  Interstellar -> tt0816692
+  Parasite -> tt0084472
+
+=== Test 2: Entity lookup ===
+  title: Inception
+  year: 2010
+  rating: 8.8
+  genres: Action,Adventure,Sci-Fi
+  overview: Cobb, a skilled thief who commits corporate espionage by infiltrating the subcon...
+  poster_path: /oYuLEt3zVCKq57qu2F8dT7NIa6f.jpg
+
+=== Test 3: Plot analysis ===
+  plot_text length: 5338
+  plot_text[:80]: Dominick "Dom" Cobb and Arthur are "extractors", who perform corporate espionage...
+
+=== Test 4: Critic summary ===
+  No reviews found
+
+=== Test 5: Movie similarity ===
+  Found 10 similar movies
+    Donnie Darko (2001) - 8 shared tags
+    Dark City (1998) - 7 shared tags
+    Fight Club (1999) - 6 shared tags
+
+=== Test 6: Top rated (Action, top 5) ===
+  Sabayan sa laban (2002) - 9.8
+  Short Fuse (2026) - 9.7
+  Alpha: Men Love Vengeance (2026) - 9.6
+  Gintama: Yoshiwara in Flames (2026) - 9.6
+  Di bale na lang (1987) - 9.6
+
+=== Test 7: Person filmography (Christopher Nolan) ===
+  name: Christopher Nolan
+  professions: producer,writer,director
+  credit_count: 47
+    The Odyssey (2026) - director
+    The Odyssey (2026) - writer
+    The Odyssey (2026) - producer
+    Hans Zimmer & Friends: Diamond in the Desert (2025) - self
+    Utan ord - I filmmusikens vΣrld (2024) - self
+
+=== Test 8: Movie comparison (Inception vs Interstellar) ===
+  movie_a: Inception (2010) - 8.8
+  movie_b: Interstellar (2014) - 8.7
+
+=== All tests completed ===

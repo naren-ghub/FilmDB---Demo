@@ -1,0 +1,179 @@
+19:55:05 | INFO    | \u2554\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2557
+19:55:05 | INFO    | \u2551   FilmDB Knowledge Base Mapping Pipeline     \u2551
+19:55:05 | INFO    | \u255a\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u255d
+
+19:55:05 | INFO    | \u2550\u2550\u2550 Layer 1: movie_entity (IMDb master) \u2550\u2550\u2550
+19:55:05 | INFO    |   Loading title.basics.tsv à
+19:55:37 | INFO    |   Loaded 12,336,661 total title rows
+19:55:38 | INFO    |   Filtered to 730,319 movies (non-adult)
+19:55:38 | INFO    |   Merging IMDb ratings à
+19:55:39 | INFO    |   Ratings merged: 335,434 rated movies
+19:55:39 | INFO    |   Cross-referencing TMDB IDs à
+19:55:53 | INFO    |   TMDB IDs matched: 347,413
+19:55:53 | INFO    |   Cross-referencing MovieLens IDs à
+19:55:54 | INFO    |   MovieLens IDs matched: 71,337
+19:55:56 | INFO    |   \u2705 Saved movie_entity.parquet: 730,319 rows, 21.5 MB
+19:55:56 | INFO    |   Layer 1 done in 51.5s
+
+19:55:57 | INFO    | \u2550\u2550\u2550 Layer 2: metadata_layer (TMDB enrichment) \u2550\u2550\u2550
+19:55:57 | INFO    |   Loading TMDB v11 dataset à
+19:56:22 | INFO    |   TMDB rows with imdb_id: 654,915
+19:56:24 | INFO    |   Matched to movie_entity: 347,413
+19:56:28 | INFO    |   \u2705 Saved metadata_layer.parquet: 347,413 rows, 87.8 MB
+19:56:28 | INFO    |   Layer 2 done in 30.6s
+
+19:56:29 | INFO    | \u2550\u2550\u2550 Layer 3: plot_layer (Wikipedia plots) \u2550\u2550\u2550
+19:56:29 | INFO    |   Loading Wikipedia plots à
+19:56:31 | INFO    |   Wiki rows with title+plot: 34,886
+19:56:31 | INFO    |   Building title+year lookup index à
+19:57:09 | INFO    |   Matching wiki plots to IMDb IDs à
+
+  Wiki\u2192IMDb:   0%|          | 0/34886 [00:00<?, ?it/s]
+  Wiki\u2192IMDb:   2%|1         | 570/34886 [00:00<00:06, 5689.76it/s]
+  Wiki\u2192IMDb:   8%|8         | 2947/34886 [00:00<00:01, 16231.03it/s]
+  Wiki\u2192IMDb:  15%|#5        | 5399/34886 [00:00<00:01, 19920.14it/s]
+  Wiki\u2192IMDb:  22%|##1       | 7601/34886 [00:00<00:01, 20713.00it/s]
+  Wiki\u2192IMDb:  30%|##9       | 10378/34886 [00:00<00:01, 23194.52it/s]
+  Wiki\u2192IMDb:  37%|###7      | 12965/34886 [00:00<00:00, 24064.92it/s]
+  Wiki\u2192IMDb:  46%|####5     | 16010/34886 [00:00<00:00, 26130.69it/s]
+  Wiki\u2192IMDb:  53%|#####3    | 18624/34886 [00:00<00:00, 25195.84it/s]
+  Wiki\u2192IMDb:  63%|######2   | 21836/34886 [00:00<00:00, 27298.90it/s]
+  Wiki\u2192IMDb:  72%|#######1  | 25077/34886 [00:01<00:00, 28823.85it/s]
+  Wiki\u2192IMDb:  80%|########  | 27977/34886 [00:01<00:00, 28792.80it/s]
+  Wiki\u2192IMDb:  88%|########8 | 30864/34886 [00:01<00:00, 28012.65it/s]
+  Wiki\u2192IMDb:  97%|#########6| 33674/34886 [00:01<00:00, 26470.52it/s]
+  Wiki\u2192IMDb: 100%|##########| 34886/34886 [00:01<00:00, 25049.67it/s]
+19:57:11 | INFO    |   Matched: 29,724 / 34,886 (85.2%)
+19:57:11 | INFO    |   \u2705 Saved plot_layer.parquet: 29,724 rows, 39.6 MB
+19:57:11 | INFO    |   Layer 3 done in 42.7s
+
+19:57:11 | INFO    | \u2550\u2550\u2550 Layer 4: review_layer (Rotten Tomatoes) \u2550\u2550\u2550
+19:57:11 | INFO    |   Loading RT movies à
+19:57:12 | INFO    |   RT movies with title: 142,891
+19:57:43 | INFO    |   Matching RT movies to IMDb IDs à
+
+  RT\u2192IMDb:   0%|          | 0/142891 [00:00<?, ?it/s]
+  RT\u2192IMDb:   0%|          | 1/142891 [00:00<5:44:22,  6.92it/s]
+  RT\u2192IMDb:   1%|          | 882/142891 [00:00<00:32, 4381.44it/s]
+  RT\u2192IMDb:   1%|1         | 1818/142891 [00:00<00:21, 6425.13it/s]
+  RT\u2192IMDb:   2%|1         | 2836/142891 [00:00<00:17, 7811.86it/s]
+  RT\u2192IMDb:   3%|2         | 3861/142891 [00:00<00:16, 8651.82it/s]
+  RT\u2192IMDb:   3%|3         | 4819/142891 [00:00<00:15, 8958.03it/s]
+  RT\u2192IMDb:   4%|4         | 5785/142891 [00:00<00:14, 9166.83it/s]
+  RT\u2192IMDb:   5%|4         | 6719/142891 [00:00<00:14, 9217.96it/s]
+  RT\u2192IMDb:   5%|5         | 7652/142891 [00:00<00:14, 9017.65it/s]
+  RT\u2192IMDb:   6%|6         | 8610/142891 [00:01<00:14, 9167.95it/s]
+  RT\u2192IMDb:   7%|6         | 9629/142891 [00:01<00:14, 9469.49it/s]
+  RT\u2192IMDb:   7%|7         | 10598/142891 [00:01<00:13, 9513.21it/s]
+  RT\u2192IMDb:   8%|8         | 11566/142891 [00:01<00:13, 9537.63it/s]
+  RT\u2192IMDb:   9%|8         | 12523/142891 [00:01<00:13, 9522.13it/s]
+  RT\u2192IMDb:   9%|9         | 13499/142891 [00:01<00:13, 9580.05it/s]
+  RT\u2192IMDb:  10%|#         | 14510/142891 [00:01<00:13, 9737.87it/s]
+  RT\u2192IMDb:  11%|#         | 15485/142891 [00:01<00:13, 9707.91it/s]
+  RT\u2192IMDb:  12%|#1        | 16490/142891 [00:01<00:12, 9803.91it/s]
+  RT\u2192IMDb:  12%|#2        | 17471/142891 [00:01<00:13, 9404.64it/s]
+  RT\u2192IMDb:  13%|#2        | 18416/142891 [00:02<00:14, 8879.38it/s]
+  RT\u2192IMDb:  14%|#3        | 19312/142891 [00:02<00:14, 8678.08it/s]
+  RT\u2192IMDb:  14%|#4        | 20185/142891 [00:02<00:14, 8581.75it/s]
+  RT\u2192IMDb:  15%|#4        | 21047/142891 [00:02<00:14, 8341.74it/s]
+  RT\u2192IMDb:  15%|#5        | 22012/142891 [00:02<00:13, 8692.95it/s]
+  RT\u2192IMDb:  16%|#6        | 22886/142891 [00:02<00:18, 6601.29it/s]
+  RT\u2192IMDb:  17%|#6        | 23622/142891 [00:02<00:20, 5763.54it/s]
+  RT\u2192IMDb:  17%|#7        | 24573/142891 [00:03<00:17, 6588.44it/s]
+  RT\u2192IMDb:  18%|#7        | 25422/142891 [00:03<00:16, 7038.34it/s]
+  RT\u2192IMDb:  19%|#8        | 26474/142891 [00:03<00:14, 7926.87it/s]
+  RT\u2192IMDb:  19%|#9        | 27364/142891 [00:03<00:14, 8173.25it/s]
+  RT\u2192IMDb:  20%|#9        | 28225/142891 [00:03<00:13, 8229.50it/s]
+  RT\u2192IMDb:  20%|##        | 29079/142891 [00:03<00:13, 8191.34it/s]
+  RT\u2192IMDb:  21%|##        | 29938/142891 [00:03<00:13, 8304.37it/s]
+  RT\u2192IMDb:  22%|##1       | 30908/142891 [00:03<00:12, 8682.30it/s]
+  RT\u2192IMDb:  22%|##2       | 31922/142891 [00:03<00:12, 9097.98it/s]
+  RT\u2192IMDb:  23%|##2       | 32842/142891 [00:03<00:12, 8869.53it/s]
+  RT\u2192IMDb:  24%|##3       | 33737/142891 [00:04<00:12, 8770.39it/s]
+  RT\u2192IMDb:  24%|##4       | 34678/142891 [00:04<00:12, 8952.33it/s]
+  RT\u2192IMDb:  25%|##4       | 35578/142891 [00:04<00:12, 8819.32it/s]
+  RT\u2192IMDb:  26%|##5       | 36464/142891 [00:04<00:12, 8806.82it/s]
+  RT\u2192IMDb:  26%|##6       | 37347/142891 [00:04<00:12, 8660.68it/s]
+  RT\u2192IMDb:  27%|##6       | 38245/142891 [00:04<00:11, 8729.73it/s]
+  RT\u2192IMDb:  27%|##7       | 39124/142891 [00:04<00:11, 8740.01it/s]
+  RT\u2192IMDb:  28%|##8       | 40031/142891 [00:04<00:11, 8833.91it/s]
+  RT\u2192IMDb:  29%|##8       | 40916/142891 [00:04<00:11, 8663.23it/s]
+  RT\u2192IMDb:  29%|##9       | 41832/142891 [00:04<00:11, 8787.41it/s]
+  RT\u2192IMDb:  30%|##9       | 42712/142891 [00:05<00:11, 8363.10it/s]
+  RT\u2192IMDb:  31%|###       | 43661/142891 [00:05<00:11, 8677.81it/s]
+  RT\u2192IMDb:  31%|###1      | 44863/142891 [00:05<00:10, 9609.38it/s]
+  RT\u2192IMDb:  32%|###2      | 46397/142891 [00:05<00:08, 11279.13it/s]
+  RT\u2192IMDb:  34%|###4      | 48774/142891 [00:05<00:06, 14951.50it/s]
+  RT\u2192IMDb:  36%|###6      | 51933/142891 [00:05<00:04, 19867.61it/s]
+  RT\u2192IMDb:  38%|###8      | 54627/142891 [00:05<00:04, 21925.72it/s]
+  RT\u2192IMDb:  40%|###9      | 57029/142891 [00:05<00:03, 22500.12it/s]
+  RT\u2192IMDb:  42%|####2     | 60113/142891 [00:05<00:03, 24937.50it/s]
+  RT\u2192IMDb:  44%|####3     | 62759/142891 [00:05<00:03, 25360.66it/s]
+  RT\u2192IMDb:  46%|####5     | 65653/142891 [00:06<00:02, 26340.54it/s]
+  RT\u2192IMDb:  48%|####8     | 69113/142891 [00:06<00:02, 28795.15it/s]
+  RT\u2192IMDb:  51%|#####     | 72517/142891 [00:06<00:02, 30337.19it/s]
+  RT\u2192IMDb:  53%|#####2    | 75554/142891 [00:06<00:02, 28698.70it/s]
+  RT\u2192IMDb:  55%|#####4    | 78444/142891 [00:06<00:02, 28522.12it/s]
+  RT\u2192IMDb:  57%|#####7    | 81649/142891 [00:06<00:02, 29537.70it/s]
+  RT\u2192IMDb:  59%|#####9    | 84616/142891 [00:06<00:01, 29311.15it/s]
+  RT\u2192IMDb:  62%|######1   | 88263/142891 [00:06<00:01, 31356.89it/s]
+  RT\u2192IMDb:  64%|######4   | 91499/142891 [00:06<00:01, 31645.71it/s]
+  RT\u2192IMDb:  67%|######6   | 95173/142891 [00:07<00:01, 33119.82it/s]
+  RT\u2192IMDb:  69%|######8   | 98493/142891 [00:07<00:01, 27676.44it/s]
+  RT\u2192IMDb:  72%|#######1  | 102382/142891 [00:07<00:01, 30553.87it/s]
+  RT\u2192IMDb:  74%|#######3  | 105586/142891 [00:07<00:01, 29130.50it/s]
+  RT\u2192IMDb:  76%|#######6  | 108610/142891 [00:07<00:01, 27437.45it/s]
+  RT\u2192IMDb:  78%|#######8  | 111780/142891 [00:07<00:01, 28543.14it/s]
+  RT\u2192IMDb:  81%|########  | 115400/142891 [00:07<00:00, 30567.55it/s]
+  RT\u2192IMDb:  83%|########2 | 118529/142891 [00:07<00:00, 30324.47it/s]
+  RT\u2192IMDb:  85%|########5 | 121612/142891 [00:07<00:00, 28027.33it/s]
+  RT\u2192IMDb:  87%|########7 | 124477/142891 [00:08<00:00, 21984.38it/s]
+  RT\u2192IMDb:  90%|########9 | 128002/142891 [00:08<00:00, 25046.67it/s]
+  RT\u2192IMDb:  92%|#########1| 130756/142891 [00:08<00:00, 23851.65it/s]
+  RT\u2192IMDb:  94%|#########4| 134488/142891 [00:08<00:00, 27139.60it/s]
+  RT\u2192IMDb:  97%|#########6| 137961/142891 [00:08<00:00, 29089.02it/s]
+  RT\u2192IMDb:  99%|#########8| 141064/142891 [00:08<00:00, 29571.03it/s]
+  RT\u2192IMDb: 100%|##########| 142891/142891 [00:08<00:00, 16288.84it/s]
+19:57:51 | INFO    |   RT movies matched: 107,064 / 142,891
+19:57:51 | INFO    |   Loading RT reviews (chunked) à
+19:57:58 | INFO    |   Processed 11 chunks
+19:58:01 | INFO    |   \u2705 Saved review_layer.parquet: 926,830 rows, 80.5 MB
+19:58:01 | INFO    |   Layer 4 done in 49.4s
+
+19:58:01 | INFO    | \u2550\u2550\u2550 Layer 5: recommendation_layer (MovieLens ML-32M) \u2550\u2550\u2550
+19:58:01 | INFO    |   MovieLens link entries: 87,585
+19:58:01 | INFO    |   Aggregating MovieLens ratings (chunked, 32M rows) à
+19:58:12 | INFO    |     Processed 5,000,000 rating rows à
+19:58:27 | INFO    |     Processed 10,000,000 rating rows à
+19:58:37 | INFO    |     Processed 15,000,000 rating rows à
+19:58:46 | INFO    |     Processed 20,000,000 rating rows à
+19:58:52 | INFO    |     Processed 25,000,000 rating rows à
+19:58:58 | INFO    |     Processed 30,000,000 rating rows à
+19:59:00 | INFO    |   Computing per-movie stats for 84,432 movies à
+19:59:02 | INFO    |   Aggregating MovieLens tags à
+19:59:06 | INFO    |   Computing top tags for 51,323 movies à
+19:59:09 | INFO    |   \u2705 Saved recommendation_layer.parquet: 87,585 rows, 4.5 MB
+19:59:09 | INFO    |   Layer 5 done in 68.1s
+
+19:59:12 | INFO    | \u2550\u2550\u2550 Layer 6: regional_layer (Indian Movies) \u2550\u2550\u2550
+19:59:12 | INFO    |   Loading Indian movies à
+19:59:12 | INFO    |   \u2705 Saved regional_layer.parquet: 50,602 rows, 1.3 MB
+19:59:12 | INFO    |   Layer 6 done in 0.4s
+
+19:59:12 | INFO    | \u2550\u2550\u2550 Layer 7: analysis_layer (placeholder ù awaiting scraping) \u2550\u2550\u2550
+19:59:12 | INFO    |   Created empty analysis_layer.jsonl
+19:59:12 | INFO    |   \u2705 Schema saved to analysis_layer_schema.json
+19:59:12 | INFO    |   \u23f3 analysis_layer.jsonl awaiting scraping pipeline
+
+19:59:12 | INFO    | \u2554\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2557
+19:59:12 | INFO    | \u2551               Pipeline Complete              \u2551
+19:59:12 | INFO    | \u255a\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u255d
+19:59:12 | INFO    |   Total time: 4.1 minutes
+19:59:12 | INFO    |   Output dir: D:\Evolve_Robot_Lab\Project\FilmDB_Demo\rag\processed_dataset
+19:59:12 | INFO    |     analysis_layer_schema.json: 0.0 MB
+19:59:12 | INFO    |     metadata_layer.parquet: 87.8 MB
+19:59:12 | INFO    |     movie_entity.parquet: 21.5 MB
+19:59:12 | INFO    |     plot_layer.parquet: 39.6 MB
+19:59:12 | INFO    |     recommendation_layer.parquet: 4.5 MB
+19:59:12 | INFO    |     regional_layer.parquet: 1.3 MB
+19:59:12 | INFO    |     review_layer.parquet: 80.5 MB

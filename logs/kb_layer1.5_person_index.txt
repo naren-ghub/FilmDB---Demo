@@ -1,0 +1,20 @@
+07:56:20 | INFO    | Loading existing movie_entity.parquet à
+07:56:22 | INFO    |   Loaded 730,319 movies
+
+07:56:22 | INFO    | \u2550\u2550\u2550 Layer 1.5: person_index (IMDb People) \u2550\u2550\u2550
+07:56:22 | INFO    |   Valid movie IDs: 730,319
+07:56:22 | INFO    |   Loading title.principals.tsv (chunked, ~98M rows) à
+07:58:48 | INFO    |     Processed 20M principal rows, 879,359 people so far à
+07:59:58 | INFO    |     Processed 40M principal rows, 1,295,081 people so far à
+08:01:23 | INFO    |     Processed 60M principal rows, 1,702,445 people so far à
+08:02:58 | INFO    |     Processed 80M principal rows, 2,119,220 people so far à
+08:03:52 | INFO    |   Principals done: 2,353,313 people with movie credits
+08:03:52 | INFO    |   Loading title.crew.tsv for director/writer credits à
+08:05:16 | INFO    |   After crew merge: 2,365,944 people
+08:05:16 | INFO    |   Loading name.basics.tsv for person metadata à
+08:05:52 | INFO    |   Names matched: 2,365,560
+08:05:52 | INFO    |   Building person_index records à
+08:06:22 | INFO    |   Person index: 2,365,560 people
+08:06:27 | INFO    |   \u2705 Saved person_index.parquet: 2,365,560 rows, 162.3 MB
+08:06:27 | INFO    |   Layer 1.5 done in 605.1s
+

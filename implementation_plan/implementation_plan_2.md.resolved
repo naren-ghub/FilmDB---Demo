@@ -1,0 +1,106 @@
+# Fix: Query Timeout on "summarize the plot of 2001 Space Odyssey"
+
+## Root Cause Analysis
+
+The user sees **"The request timed out"** — this comes from [api_client.py:38-41](file:///D:/Evolve_Robot_Lab/Project/FilmDB_Demo/ui/api_client.py#L38-L41) when the backend `/chat` response takes longer than **120 seconds**.
+
+Three bottlenecks stack on top of each other:
+
+| # | Bottleneck | Where | Worst case |
+|---|-----------|-------|------------|
+| 1 | **Parquet cold-start** | [FilmDBQueryEngine.__init__](file:///D:/Evolve_Robot_Lab/Project/FilmDB_Demo/rag/filmdb_query_engine.py#L37-L76) loads **~416 MB** of parquet + builds title/person indices on the **first request** | 30-60s |
+| 2 | **Groq LLM — no timeout** | [GroqClient._chat](file:///D:/Evolve_Robot_Lab/Project/FilmDB_Demo/backend/app/llm/groq_client.py#L31-L43) calls Groq API with **no timeout** parameter. Up to 3 calls per request (intent + response + grounding retry) | 30s+ each |
+| 3 | **Wikipedia optional tool** | [routing_matrix.py](file:///D:/Evolve_Robot_Lab/Project/FilmDB_Demo/backend/app/routing_matrix.py#L20) routes `PLOT_EXPLANATION` with `optional: ["kb_entity", "wikipedia"]` — Wikipedia API can add **15s** if it times out | 15s |
+
+**Combined worst case**: 60s (parquet) + 90s (3× Groq calls) + 15s (Wikipedia) = **165s** > 120s UI timeout.
+
+> [!IMPORTANT]
+> The parquet cold-start only affects the **very first request** after the backend starts. Subsequent requests reuse the singleton. However, the Groq timeout issue affects **every** request.
+
+---
+
+## Proposed Changes
+
+### 1. Eager-load parquet at startup
+
+#### [MODIFY] [main.py](file:///D:/Evolve_Robot_Lab/Project/FilmDB_Demo/backend/app/main.py)
+
+Pre-load the [FilmDBQueryEngine](file:///d:/Evolve_Robot_Lab/Project/FilmDB_Demo/rag/filmdb_query_engine.py#32-436) singleton during FastAPI [startup](file:///d:/Evolve_Robot_Lab/Project/FilmDB_Demo/backend/app/main.py#17-20) instead of lazily on first request:
+
+```python
+@app.on_event("startup")
+def startup() -> None:
+    init_db()
+    # Eager-load parquet data so first request isn't slow
+    from rag.filmdb_query_engine import FilmDBQueryEngine
+    FilmDBQueryEngine.get_instance()
+```
+
+---
+
+### 2. Add timeout to Groq LLM calls
+
+#### [MODIFY] [groq_client.py](file:///D:/Evolve_Robot_Lab/Project/FilmDB_Demo/backend/app/llm/groq_client.py)
+
+Add a `timeout` parameter to the Groq API call. The Groq Python SDK supports this:
+
+```python
+def _chat(self, messages: list[dict[str, str]], temperature: float) -> str:
+    if not self.client:
+        return ""
+    try:
+        response = self.client.chat.completions.create(
+            model=self.model,
+            messages=cast(Any, messages),
+            temperature=temperature,
+            timeout=30.0,  # 30 second timeout per LLM call
+        )
+        return response.choices[0].message.content or ""
+    except Exception:
+        logging.exception("Groq request failed")
+        return ""
+```
+
+---
+
+### 3. Add overall request timeout in conversation engine
+
+#### [MODIFY] [conversation_engine.py](file:///D:/Evolve_Robot_Lab/Project/FilmDB_Demo/backend/app/conversation_engine.py)
+
+Wrap the [_execute_tools](file:///d:/Evolve_Robot_Lab/Project/FilmDB_Demo/backend/app/conversation_engine.py#450-582) `asyncio.gather` with `asyncio.wait_for` to cap total tool execution time. Add a per-tool timeout:
+
+```python
+# In _execute_tools, wrap gather with overall timeout
+try:
+    results = await asyncio.wait_for(
+        asyncio.gather(*tasks, return_exceptions=True),
+        timeout=45.0  # max 45s for all tools combined
+    )
+except asyncio.TimeoutError:
+    self.logger.warning("Tool execution timed out after 45s")
+    results = [TimeoutError("Tool execution timed out") for _ in tasks]
+```
+
+---
+
+## User Review Required
+
+> [!IMPORTANT]
+> The changes above address 3 independent bottlenecks. The most impactful are **#1** (parquet cold-start) and **#2** (Groq timeout). Would you like me to proceed with all 3, or just the first two?
+
+> [!NOTE]
+> After these fixes, the expected request timeline becomes:
+> - Intent classification: ~2-3s (Groq, with 30s cap)
+> - Tool execution: ~0.5-2s (KB parquet lookups are instant; Wikipedia is optional)
+> - Response generation: ~3-5s (Groq, with 30s cap)
+> - **Total: ~6-10s** (well within the 120s UI timeout)
+
+---
+
+## Verification Plan
+
+### Manual Verification
+1. Restart the backend: `uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload`
+2. Watch the startup logs — the `FilmDBQueryEngine: ready` log should appear **during startup**, not on first request
+3. Send the same query via the Streamlit UI: "summarize the plot of Stanley Kubrick's 2001 space odyssey"
+4. Confirm the response appears within ~10-15 seconds without timeout

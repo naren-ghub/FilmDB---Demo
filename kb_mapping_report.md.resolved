@@ -1,0 +1,232 @@
+# FilmDB KB Mapping — Pipeline Execution Report
+
+> **Pipeline:** [rag/kb_mapping.py](file:///D:/Evolve_Robot_Lab/Project/FilmDB_Demo/rag/kb_mapping.py)  
+> **Total Runtime:** 4.1 minutes  
+> **Date:** 2026-03-05  
+> **Output:** `rag/processed_dataset/`
+
+---
+
+## Architecture
+
+```mermaid
+graph TD
+    subgraph "Raw Data Sources (~12 GB)"
+        A1[IMDb title.basics.tsv<br>12.3M titles]
+        A2[IMDb title.ratings.tsv<br>1.6M rated]
+        A3[TMDB v11<br>1.4M movies]
+        A4[GroupLens ML-32M<br>32M ratings]
+        A5[Wikipedia Plots<br>34.9K plots]
+        A6[Rotten Tomatoes<br>143K movies + 1M reviews]
+        A7[Indian Movies<br>50.6K films]
+    end
+
+    subgraph "Processing Pipeline"
+        B1[Layer 1: Filter movies<br>Cross-reference IDs]
+        B2[Layer 2: TMDB inner join]
+        B3[Layer 3: Title+Year matching]
+        B4[Layer 4: Title+Year → slug → reviews]
+        B5[Layer 5: Chunked aggregation]
+        B6[Layer 6: Direct tconst mapping]
+    end
+
+    subgraph "Output Layers (Parquet)"
+        C1[movie_entity.parquet<br>730K movies, 21.5 MB]
+        C2[metadata_layer.parquet<br>347K movies, 87.8 MB]
+        C3[plot_layer.parquet<br>29.7K plots, 39.6 MB]
+        C4[review_layer.parquet<br>927K reviews, 80.5 MB]
+        C5[recommendation_layer.parquet<br>87.6K movies, 4.5 MB]
+        C6[regional_layer.parquet<br>50.6K films, 1.3 MB]
+    end
+
+    A1 & A2 --> B1 --> C1
+    A3 --> B2 --> C2
+    A5 --> B3 --> C3
+    A6 --> B4 --> C4
+    A4 --> B5 --> C5
+    A7 --> B6 --> C6
+
+    C1 -.->|imdb_id PK| C2 & C3 & C4 & C5 & C6
+```
+
+---
+
+## Layer Results Summary
+
+| Layer | Output | Rows | Size | Match Rate | Time |
+|-------|--------|------|------|-----------|------|
+| 1. movie_entity | `movie_entity.parquet` | **730,319** | 21.5 MB | — | 52s |
+| 2. metadata | `metadata_layer.parquet` | **347,413** | 87.8 MB | 47.6% of master | 31s |
+| 3. plot | `plot_layer.parquet` | **29,724** | 39.6 MB | 85.2% of wiki | 43s |
+| 4. review | `review_layer.parquet` | **926,830** | 80.5 MB | 74.9% of RT | 49s |
+| 5. recommendation | `recommendation_layer.parquet` | **87,585** | 4.5 MB | 97.1% of ML | 68s |
+| 6. regional | `regional_layer.parquet` | **50,602** | 1.3 MB | Direct ID | <1s |
+| 7. analysis (stub) | `analysis_layer_schema.json` | 0 | <1 KB | Awaiting | <1s |
+| **Total** | **6 parquet + 1 schema** | | **235.2 MB** | | **4.1 min** |
+
+---
+
+## Layer Details
+
+### Layer 1: `movie_entity.parquet` — Master Table
+
+**Source:** IMDb `title.basics.tsv` (12,336,661 total titles)
+
+| Step | Result |
+|------|--------|
+| Filter `titleType == "movie"` + non-adult | **730,319 movies** |
+| Merge IMDb ratings | 335,434 rated (45.9%) |
+| Cross-ref TMDB IDs | 347,413 matched (47.6%) |
+| Cross-ref MovieLens IDs | 71,337 matched (9.8%) |
+
+**Schema:** `imdb_id` (PK), `title`, `year`, `runtime`, `genres`, `imdb_rating`, `imdb_votes`, `tmdb_id`, `movielens_id`
+
+---
+
+### Layer 2: `metadata_layer.parquet` — TMDB Enrichment
+
+**Source:** TMDB v11 (654,915 rows with imdb_id)  
+**Join:** `tmdb.imdb_id → movie_entity.imdb_id` (inner join)  
+**Result:** **347,413 movies** with rich metadata
+
+**Schema:** `imdb_id`, `tmdb_id`, `title`, `overview`, `popularity`, `vote_average`, `vote_count`, `tagline`, `budget`, `revenue`, `poster_path`, `keywords`, `production_companies`, `spoken_languages`, `original_language`, `release_date`, `status`
+
+> **RAG Value:** The `overview` and `keywords` fields are prime candidates for vector embedding.
+
+---
+
+### Layer 3: `plot_layer.parquet` — Wikipedia Plots
+
+**Source:** Wikipedia movie plots (34,886 entries)  
+**Mapping:** Title + Year exact match against movie_entity lookup dictionary  
+**Result:** **29,724 matched (85.2%)**, 5,162 unmatched
+
+**Schema:** `imdb_id`, `plot_text`, `source`, `origin_ethnicity`, `director`, `cast`, `genre`, `wiki_page`
+
+> **RAG Value:** `plot_text` is the richest free-text field — full plot summaries averaging hundreds of words. Ideal for chunked embedding.
+
+---
+
+### Layer 4: `review_layer.parquet` — Rotten Tomatoes Reviews
+
+**Source:** RT movies (142,891) + RT reviews (1,049,534)
+
+| Step | Result |
+|------|--------|
+| RT movies → IMDb ID match | **107,064 matched (74.9%)** |
+| Reviews joined via RT slug | **926,830 reviews** with text > 20 chars |
+
+**Schema:** `imdb_id`, `rt_id`, `critic_name`, `review_text`, `sentiment`, `score`, `is_top_critic`, `review_state`
+
+> **RAG Value:** `review_text` provides diverse critical perspectives. The `sentiment` field enables sentiment-filtered retrieval.
+
+---
+
+### Layer 5: `recommendation_layer.parquet` — MovieLens Ratings & Tags
+
+**Source:** ML-32M (32,000,204 ratings + 2,000,072 tags)  
+**Strategy:** Chunked aggregation — 32M individual ratings aggregated to per-movie stats
+
+| Step | Result |
+|------|--------|
+| Movies with ratings | **84,432** |
+| Movies with tags | **51,323** |
+| Combined output | **87,585 movies** |
+
+**Schema:** `imdb_id`, `movielens_id`, `ml_avg_rating`, `ml_rating_count`, `ml_tags` (pipe-separated top 20), `ml_tag_count`
+
+> **RAG Value:** `ml_tags` provides user-generated semantic descriptors (e.g. "atmospheric", "plot twist"). Useful for similarity and recommendation queries.
+
+---
+
+### Layer 6: `regional_layer.parquet` — Indian Cinema
+
+**Source:** Indian movies dataset (50,602 films)  
+**Mapping:** `ID` column is already IMDb `tconst` format — direct mapping
+
+**Schema:** `imdb_id`, `title`, `year`, `language`, `region`, `rating`, `votes`, `genre`, `source`
+
+> **RAG Value:** Enables language-filtered queries (Tamil, Hindi, Malayalam, etc.) and regional cinema analysis.
+
+---
+
+### Layer 7: `analysis_layer` — Web Scraping (Placeholder)
+
+**Status:** ⏳ Schema defined, awaiting scraping pipeline
+
+**Target sources:**
+- BFI (British Film Institute) — Film theory
+- Senses of Cinema — Director analysis
+- Bright Lights Film Journal — Film analysis
+- Film Companion — Regional film reviews
+
+**Expected output:** 20K–80K articles → JSONL format → each article mapped to `imdb_id` via NER + fuzzy matching
+
+**Schema:** Defined in `rag/processed_dataset/analysis_layer_schema.json`
+
+```json
+{
+  "source": "BFI",
+  "knowledge_type": "film_theory",
+  "title": "The Cinematic Language of Kubrick",
+  "author": "John Doe",
+  "entities": {"directors": [...], "films": [...]},
+  "imdb_ids": ["tt0062622"],
+  "text": "...article content...",
+  "chunks": ["...400-600 token segments..."],
+  "url": "https://..."
+}
+```
+
+> When the scraping pipeline runs, it should output to `rag/scraped_articles/analysis_layer.jsonl` and use the `movie_entity.parquet` lookup table for entity→imdb_id resolution.
+
+---
+
+## Output File Map
+
+```
+rag/
+├── kb_mapping.py                           ← Pipeline script
+├── processed_dataset/
+│   ├── movie_entity.parquet               (730,319 rows, 21.5 MB)
+│   ├── metadata_layer.parquet             (347,413 rows, 87.8 MB)
+│   ├── plot_layer.parquet                 (29,724 rows, 39.6 MB)
+│   ├── review_layer.parquet               (926,830 rows, 80.5 MB)
+│   ├── recommendation_layer.parquet       (87,585 rows, 4.5 MB)
+│   ├── regional_layer.parquet             (50,602 rows, 1.3 MB)
+│   └── analysis_layer_schema.json         (schema definition)
+├── raw_dataset/                            ← Mirrors kb/ folder
+│   ├── IMDb/
+│   ├── grouplens/
+│   ├── indian movies/
+│   ├── rotten_tomato_film_review/
+│   ├── the_movie_data_set_tmdb/
+│   └── wikipedia_movie_plot/
+├── scraped_articles/
+│   └── analysis_layer.jsonl               ← Empty, awaiting scraping
+└── rag_corpus/                             ← Reserved for vector DB
+```
+
+---
+
+## Cross-Reference Coverage
+
+How many of the 730,319 master movies have data in each layer:
+
+| Layer | Movies Covered | Coverage |
+|-------|---------------|----------|
+| IMDb Ratings | 335,434 | 45.9% |
+| TMDB Metadata | 347,413 | 47.6% |
+| Wikipedia Plots | 29,724 | 4.1% |
+| RT Reviews | ~107,064 movies | 14.7% |
+| MovieLens Ratings | 84,432 | 11.6% |
+| Indian Regional | 50,602 | 6.9% |
+| **≥1 enrichment** | **~400K+** | **~55%** |
+
+---
+
+## Next Steps
+
+1. **RAG Embedding Pipeline** — Chunk `plot_text`, `overview`, `review_text` → embed with sentence transformer → store in vector DB
+2. **Web Scraping Pipeline** — Implement the scraping flow per `filmdB_scraping_pipeline_instruction.md` → populate `analysis_layer.jsonl`
+3. **Unified Retrieval** — Build a retrieval layer that queries all layers by `imdb_id` and returns combined context for LLM synthesis

@@ -17,6 +17,16 @@ class ChatRequest(BaseModel):
 @app.on_event("startup")
 def startup() -> None:
     init_db()
+    # Eager-load parquet data so the first request isn't slow
+    import logging
+    log = logging.getLogger(__name__)
+    log.info("Eager-loading FilmDBQueryEngine …")
+    try:
+        from rag.filmdb_query_engine import FilmDBQueryEngine
+        FilmDBQueryEngine.get_instance()
+        log.info("FilmDBQueryEngine ready.")
+    except Exception:
+        log.exception("Failed to pre-load FilmDBQueryEngine — KB tools will retry lazily")
 
 
 @app.post("/chat")

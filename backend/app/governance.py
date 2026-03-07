@@ -58,6 +58,42 @@ TOOL_REGISTRY = {
         "description": "Rotten Tomatoes critics sentiment (score only)",
         "required": ["title"],
     },
+    # ── KB-powered tools ─────────────────────────────────────────────────
+    "kb_entity": {
+        "name": "kb_entity",
+        "description": "KB movie entity lookup (local data)",
+        "required": ["title"],
+    },
+    "kb_plot": {
+        "name": "kb_plot",
+        "description": "KB Wikipedia plot retrieval",
+        "required": ["title"],
+    },
+    "kb_critic": {
+        "name": "kb_critic",
+        "description": "KB Rotten Tomatoes critic summary",
+        "required": ["title"],
+    },
+    "kb_similarity": {
+        "name": "kb_similarity",
+        "description": "KB tag-based movie similarity",
+        "required": ["title"],
+    },
+    "kb_top_rated": {
+        "name": "kb_top_rated",
+        "description": "KB top rated movies (genre/year/language filters)",
+        "required": [],
+    },
+    "kb_filmography": {
+        "name": "kb_filmography",
+        "description": "KB person filmography lookup",
+        "required": ["name"],
+    },
+    "kb_comparison": {
+        "name": "kb_comparison",
+        "description": "KB side-by-side movie comparison",
+        "required": ["title_a", "title_b"],
+    },
 }
 
 

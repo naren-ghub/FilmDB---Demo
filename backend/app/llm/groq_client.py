@@ -36,6 +36,7 @@ class GroqClient:
                 model=self.model,
                 messages=cast(Any, messages),
                 temperature=temperature,
+                timeout=30.0,
             )
             return response.choices[0].message.content or ""
         except Exception:

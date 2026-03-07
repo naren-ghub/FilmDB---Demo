@@ -21,10 +21,12 @@ def select_response_mode(
         return "AVAILABILITY_FOCUS"
     if primary_intent == "RECOMMENDATION":
         return "RECOMMENDATION_GRID"
+    if primary_intent == "MOVIE_SIMILARITY":
+        return "RECOMMENDATION_GRID"
     if primary_intent == "ANALYTICAL_EXPLANATION":
         return "EXPLANATION_PLUS_AVAILABILITY" if has_streaming else "EXPLANATION_ONLY"
     if primary_intent == "ENTITY_LOOKUP":
-        return "FULL_CARD" if tool_outputs.get("imdb") else "MINIMAL_CARD"
+        return "FULL_CARD" if tool_outputs.get("imdb") or tool_outputs.get("kb_entity") else "MINIMAL_CARD"
     if primary_intent == "REVIEWS":
         return "EXPLANATION_PLUS_AVAILABILITY" if has_streaming else "EXPLANATION_ONLY"
     if primary_intent == "TRENDING":
@@ -43,6 +45,14 @@ def select_response_mode(
         return "EXPLANATION_ONLY"
     if primary_intent == "PERSON_LOOKUP":
         return "FULL_CARD"
+    if primary_intent == "FILMOGRAPHY":
+        return "FILMOGRAPHY_LIST"
+    if primary_intent == "PLOT_EXPLANATION":
+        return "ANALYSIS_TEXT"
+    if primary_intent == "CRITIC_SUMMARY":
+        return "ANALYSIS_TEXT"
+    if primary_intent == "COMPARISON":
+        return "COMPARISON_TABLE"
     if primary_intent == "AWARD_LOOKUP":
         has_list = False
         for key in ("imdb_trending_tamil", "imdb_top_rated_english", "imdb_upcoming"):

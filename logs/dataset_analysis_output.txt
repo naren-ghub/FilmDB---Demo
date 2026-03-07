@@ -1,0 +1,197 @@
+=== Indian Movies (indian movies.csv) ===
+  Size: 3.25 MB (3,408,201 bytes)
+  Num Columns: 8
+  Columns: ['ID', 'Movie Name', 'Year', 'Timing(min)', 'Rating(10)', 'Votes', 'Genre', 'Language']
+  Row count: 50,602
+  Sample rows (first 5):
+    ['tt0398974', 'Dr. Shaitan', '1960', '-', '-', '-', '-', 'hindi']
+    ['tt1702558', 'Nadir Khan', '1968', '-', '-', '-', '-', 'urdu']
+    ['tt0493437', 'Apna Sapna Money Money', '2006', '134 min', '5.3', '1,892', 'Comedy, Musical, Romance            ', 'hindi']
+    ['tt0273405', 'Aag Aur Sholay', '1987', '-', '2.2', '20', '-', 'urdu']
+    ['tt0049595', 'Parivar', '1956', '-', '7.4', '21', 'Comedy, Drama, Family            ', 'hindi']
+
+=== GroupLens/movies.csv ===
+  Size: 4.05 MB (4,242,926 bytes)
+  Num Columns: 3
+  Columns: ['movieId', 'title', 'genres']
+  Row count: 87,585
+  Sample rows (first 5):
+    ['1', 'Toy Story (1995)', 'Adventure|Animation|Children|Comedy|Fantasy']
+    ['2', 'Jumanji (1995)', 'Adventure|Children|Fantasy']
+    ['3', 'Grumpier Old Men (1995)', 'Comedy|Romance']
+    ['4', 'Waiting to Exhale (1995)', 'Comedy|Drama|Romance']
+    ['5', 'Father of the Bride Part II (1995)', 'Comedy']
+
+=== GroupLens/links.csv ===
+  Size: 1.86 MB (1,950,748 bytes)
+  Num Columns: 3
+  Columns: ['movieId', 'imdbId', 'tmdbId']
+  Row count: 87,585
+  Sample rows (first 5):
+    ['1', '0114709', '862']
+    ['2', '0113497', '8844']
+    ['3', '0113228', '15602']
+    ['4', '0114885', '31357']
+    ['5', '0113041', '11862']
+
+=== GroupLens/tags.csv ===
+  Size: 69.00 MB (72,353,890 bytes)
+  Num Columns: 4
+  Columns: ['userId', 'movieId', 'tag', 'timestamp']
+  Row count: 2,000,072
+  Sample rows (first 5):
+    ['22', '26479', 'Kevin Kline', '1583038886']
+    ['22', '79592', 'misogyny', '1581476297']
+    ['22', '247150', 'acrophobia', '1622483469']
+    ['34', '2174', 'music', '1249808064']
+    ['34', '2174', 'weird', '1249808102']
+
+=== Rotten Tomatoes/rotten_tomatoes_movies.csv ===
+  Size: 16.59 MB (17,396,636 bytes)
+  Num Columns: 16
+  Columns: ['id', 'title', 'audienceScore', 'tomatoMeter', 'rating', 'ratingContents', 'releaseDateTheaters', 'releaseDateStreaming', 'runtimeMinutes', 'genre', 'originalLanguage', 'director', 'writer', 'boxOffice', 'distributor', 'soundMix']
+  Row count: 143,258
+  Sample rows (first 5):
+    ['space-zombie-bingo', 'Space Zombie Bingo!', '50', '', '', '', '', '2018-08-25', '75', 'Comedy, Horror, Sci-fi']
+    ['the_green_grass', 'The Green Grass', '', '', '', '', '', '2020-02-11', '114', 'Drama']
+    ['love_lies', 'Love, Lies', '43', '', '', '', '', '', '120', 'Drama']
+    ['the_sore_losers_1997', 'Sore Losers', '60', '', '', '', '', '2020-10-23', '90', 'Action, Mystery & thriller']
+    ['dinosaur_island_2002', 'Dinosaur Island', '70', '', '', '', '', '2017-03-27', '80', 'Fantasy, Adventure, Animation']
+
+=== Wikipedia/wiki_movie_plots_deduped.csv ===
+  Size: 77.43 MB (81,193,310 bytes)
+  Num Columns: 8
+  Columns: ['Release Year', 'Title', 'Origin/Ethnicity', 'Director', 'Cast', 'Genre', 'Wiki Page', 'Plot']
+  Row count: 34,886
+  Sample rows (first 5):
+    ['1901', 'Kansas Saloon Smashers', 'American', 'Unknown', '', 'unknown', 'https://en.wikipedia.org/wiki/Kansas_Saloon_Smashers', "A bartender is working at a saloon, serving drinks to customers. After he fills a stereotypically Irish man's bucket with beer, Carrie Nation and her followers burst inside. They assault the Irish man, pulling his hat over his eyes and then dumping the beer over his head. The group then begin wrecking the bar, smashing the fixtures, mirrors, and breaking the cash register. The bartender then sprays seltzer water in Nation's face before a group of policemen appear and order everybody to leave.[1]"]
+    ['1901', 'Love by the Light of the Moon', 'American', 'Unknown', '', 'unknown', 'https://en.wikipedia.org/wiki/Love_by_the_Light_of_the_Moon', "The moon, painted with a smiling face hangs over a park at night. A young couple walking past a fence learn on a railing and look up. The moon smiles. They embrace, and the moon's smile gets bigger. They then sit down on a bench by a tree. The moon's view is blocked, causing him to frown. In the last scene, the man fans the woman with his hat because the moon has left the sky and is perched over her shoulder to see everything better."]
+    ['1901', 'The Martyred Presidents', 'American', 'Unknown', '', 'unknown', 'https://en.wikipedia.org/wiki/The_Martyred_Presidents', 'The film, just over a minute long, is composed of two shots. In the first, a girl sits at the base of an altar or tomb, her face hidden from the camera. At the center of the altar, a viewing portal displays the portraits of three U.S. PresidentsùAbraham Lincoln, James A. Garfield, and William McKinleyùeach victims of assassination.\nIn the second shot, which runs just over eight seconds long, an assassin kneels feet of Lady Justice.']
+    ['1901', 'Terrible Teddy, the Grizzly King', 'American', 'Unknown', '', 'unknown', 'https://en.wikipedia.org/wiki/Terrible_Teddy,_the_Grizzly_King', 'Lasting just 61 seconds and consisting of two shots, the first shot is set in a wood during winter. The actor representing then vice-president Theodore Roosevelt enthusiastically hurries down a hillside towards a tree in the foreground. He falls once, but rights himself and cocks his rifle. Two other men, bearing signs reading "His Photographer" and "His Press Agent" respectively, follow him into the shot; the photographer sets up his camera. "Teddy" aims his rifle upward at the tree and fells what appears to be a common house cat, which he then proceeds to stab. "Teddy" holds his prize aloft, and the press agent takes notes. The second shot is taken in a slightly different part of the wood, on a path. "Teddy" rides the path on his horse towards the camera and out to the left of the shot, followed closely by the press agent and photographer, still dutifully holding their signs.']
+    ['1902', 'Jack and the Beanstalk', 'American', 'George S. Fleming, Edwin S. Porter', '', 'unknown', 'https://en.wikipedia.org/wiki/Jack_and_the_Beanstalk_(1902_film)', "The earliest known adaptation of the classic fairytale, this films shows Jack trading his cow for the beans, his mother forcing him to drop them in the front yard, and beig forced upstairs. As he sleeps, Jack is visited by a fairy who shows him glimpses of what will await him when he ascends the bean stalk. In this version, Jack is the son of a deposed king. When Jack wakes up, he finds the beanstalk has grown and he climbs to the top where he enters the giant's home. The giant finds Jack, who narrowly escapes. The giant chases Jack down the bean stalk, but Jack is able to cut it down before the giant can get to safety. He falls and is killed as Jack celebrates. The fairy then reveals that Jack may return home as a prince."]
+
+=== TMDB/keywords.csv ===
+  Size: 5.94 MB (6,231,943 bytes)
+  Num Columns: 2
+  Columns: ['id', 'keywords']
+  Row count: 46,419
+  Sample rows (first 5):
+    ['862', "[{'id': 931, 'name': 'jealousy'}, {'id': 4290, 'name': 'toy'}, {'id': 5202, 'name': 'boy'}, {'id': 6054, 'name': 'friendship'}, {'id': 9713, 'name': 'friends'}, {'id': 9823, 'name': 'rivalry'}, {'id': 165503, 'name': 'boy next door'}, {'id': 170722, 'name': 'new toy'}, {'id': 187065, 'name': 'toy comes to life'}]"]
+    ['8844', '[{\'id\': 10090, \'name\': \'board game\'}, {\'id\': 10941, \'name\': \'disappearance\'}, {\'id\': 15101, \'name\': "based on children\'s book"}, {\'id\': 33467, \'name\': \'new home\'}, {\'id\': 158086, \'name\': \'recluse\'}, {\'id\': 158091, \'name\': \'giant insect\'}]']
+    ['15602', "[{'id': 1495, 'name': 'fishing'}, {'id': 12392, 'name': 'best friend'}, {'id': 179431, 'name': 'duringcreditsstinger'}, {'id': 208510, 'name': 'old men'}]"]
+    ['31357', "[{'id': 818, 'name': 'based on novel'}, {'id': 10131, 'name': 'interracial relationship'}, {'id': 14768, 'name': 'single mother'}, {'id': 15160, 'name': 'divorce'}, {'id': 33455, 'name': 'chick flick'}]"]
+    ['11862', "[{'id': 1009, 'name': 'baby'}, {'id': 1599, 'name': 'midlife crisis'}, {'id': 2246, 'name': 'confidence'}, {'id': 4995, 'name': 'aging'}, {'id': 5600, 'name': 'daughter'}, {'id': 10707, 'name': 'mother daughter relationship'}, {'id': 13149, 'name': 'pregnancy'}, {'id': 33358, 'name': 'contraception'}, {'id': 170521, 'name': 'gynecologist'}]"]
+
+=== TMDB/links.csv ===
+  Size: 0.94 MB (989,107 bytes)
+  Num Columns: 3
+  Columns: ['movieId', 'imdbId', 'tmdbId']
+  Row count: 45,843
+  Sample rows (first 5):
+    ['1', '0114709', '862']
+    ['2', '0113497', '8844']
+    ['3', '0113228', '15602']
+    ['4', '0114885', '31357']
+    ['5', '0113041', '11862']
+
+=== TMDB/links_small.csv ===
+  Size: 0.17 MB (183,372 bytes)
+  Num Columns: 3
+  Columns: ['movieId', 'imdbId', 'tmdbId']
+  Row count: 9,125
+  Sample rows (first 5):
+    ['1', '0114709', '862']
+    ['2', '0113497', '8844']
+    ['3', '0113228', '15602']
+    ['4', '0114885', '31357']
+    ['5', '0113041', '11862']
+
+=== TMDB/movies_metadata.csv ===
+  Size: 32.85 MB (34,445,126 bytes)
+  Num Columns: 24
+  Columns: ['adult', 'belongs_to_collection', 'budget', 'genres', 'homepage', 'id', 'imdb_id', 'original_language', 'original_title', 'overview', 'popularity', 'poster_path', 'production_companies', 'production_countries', 'release_date', 'revenue', 'runtime', 'spoken_languages', 'status', 'tagline', 'title', 'video', 'vote_average', 'vote_count']
+  Row count: 45,466
+  Sample rows (first 5):
+    ['False', "{'id': 10194, 'name': 'Toy Story Collection', 'poster_path': '/7G9915LfUQ2lVfwMEEhDsn3kT4B.jpg', 'backdrop_path': '/9FBwqcd9IRruEDUrTdcaafOMKUq.jpg'}", '30000000', "[{'id': 16, 'name': 'Animation'}, {'id': 35, 'name': 'Comedy'}, {'id': 10751, 'name': 'Family'}]", 'http://toystory.disney.com/toy-story', '862', 'tt0114709', 'en', 'Toy Story', "Led by Woody, Andy's toys live happily in his room until Andy's birthday brings Buzz Lightyear onto the scene. Afraid of losing his place in Andy's heart, Woody plots against Buzz. But when circumstances separate Buzz and Woody from their owner, the duo eventually learns to put aside their differences."]
+    ['False', '', '65000000', "[{'id': 12, 'name': 'Adventure'}, {'id': 14, 'name': 'Fantasy'}, {'id': 10751, 'name': 'Family'}]", '', '8844', 'tt0113497', 'en', 'Jumanji', "When siblings Judy and Peter discover an enchanted board game that opens the door to a magical world, they unwittingly invite Alan -- an adult who's been trapped inside the game for 26 years -- into their living room. Alan's only hope for freedom is to finish the game, which proves risky as all three find themselves running from giant rhinoceroses, evil monkeys and other terrifying creatures."]
+    ['False', "{'id': 119050, 'name': 'Grumpy Old Men Collection', 'poster_path': '/nLvUdqgPgm3F85NMCii9gVFUcet.jpg', 'backdrop_path': '/hypTnLot2z8wpFS7qwsQHW1uV8u.jpg'}", '0', "[{'id': 10749, 'name': 'Romance'}, {'id': 35, 'name': 'Comedy'}]", '', '15602', 'tt0113228', 'en', 'Grumpier Old Men', "A family wedding reignites the ancient feud between next-door neighbors and fishing buddies John and Max. Meanwhile, a sultry Italian divorcΘe opens a restaurant at the local bait shop, alarming the locals who worry she'll scare the fish away. But she's less interested in seafood than she is in cooking up a hot time with Max."]
+    ['False', '', '16000000', "[{'id': 35, 'name': 'Comedy'}, {'id': 18, 'name': 'Drama'}, {'id': 10749, 'name': 'Romance'}]", '', '31357', 'tt0114885', 'en', 'Waiting to Exhale', 'Cheated on, mistreated and stepped on, the women are holding their breath, waiting for the elusive "good man" to break a string of less-than-stellar lovers. Friends and confidants Vannah, Bernie, Glo and Robin talk it all out, determined to find a better way to breathe.']
+    ['False', "{'id': 96871, 'name': 'Father of the Bride Collection', 'poster_path': '/nts4iOmNnq7GNicycMJ9pSAn204.jpg', 'backdrop_path': '/7qwE57OVZmMJChBpLEbJEmzUydk.jpg'}", '0', "[{'id': 35, 'name': 'Comedy'}]", '', '11862', 'tt0113041', 'en', 'Father of the Bride Part II', "Just when George Banks has recovered from his daughter's wedding, he receives the news that she's pregnant ... and that George's wife, Nina, is expecting too. He was planning on selling their home, but that's a plan that -- like George -- will have to change with the arrival of both a grandchild and a kid of his own."]
+
+=== IMDb TSV Files (headers + row count from line count) ===
+=== IMDb/name.basics.tsv ===
+  Size: 892.36 MB (935,711,568 bytes)
+  Num Columns: 6
+  Columns: ['nconst', 'primaryName', 'birthYear', 'deathYear', 'primaryProfession', 'knownForTitles']
+  Row count: 15,136,678
+  Sample rows (first 5):
+    ['nm0000001', 'Fred Astaire', '1899', '1987', 'actor,miscellaneous,producer', 'tt0072308,tt0050419,tt0027125,tt0025164']
+    ['nm0000002', 'Lauren Bacall', '1924', '2014', 'actress,miscellaneous,soundtrack', 'tt0037382,tt0075213,tt0038355,tt0117057']
+    ['nm0000003', 'Brigitte Bardot', '1934', '2025', 'actress,music_department,producer', 'tt0057345,tt0049189,tt0056404,tt0054452']
+    ['nm0000004', 'John Belushi', '1949', '1982', 'actor,writer,music_department', 'tt0072562,tt0077975,tt0080455,tt0078723']
+    ['nm0000005', 'Ingmar Bergman', '1918', '2007', 'writer,director,actor', 'tt0050986,tt0069467,tt0050976,tt0083922']
+
+=== IMDb/title.basics.tsv ===
+  Size: 1019.17 MB (1,068,678,684 bytes)
+  Num Columns: 9
+  Columns: ['tconst', 'titleType', 'primaryTitle', 'originalTitle', 'isAdult', 'startYear', 'endYear', 'runtimeMinutes', 'genres']
+  Row count: 12,336,661
+  Sample rows (first 5):
+    ['tt0000001', 'short', 'Carmencita', 'Carmencita', '0', '1894', '\\N', '1', 'Documentary,Short']
+    ['tt0000002', 'short', 'Le clown et ses chiens', 'Le clown et ses chiens', '0', '1892', '\\N', '5', 'Animation,Short']
+    ['tt0000003', 'short', 'Poor Pierrot', 'Pauvre Pierrot', '0', '1892', '\\N', '5', 'Animation,Comedy,Romance']
+    ['tt0000004', 'short', 'Un bon bock', 'Un bon bock', '0', '1892', '\\N', '12', 'Animation,Short']
+    ['tt0000005', 'short', 'Blacksmith Scene', 'Blacksmith Scene', '0', '1893', '\\N', '1', 'Short']
+
+=== IMDb/title.akas.tsv ===
+  ERROR: field larger than field limit (131072)
+
+=== IMDb/title.crew.tsv ===
+  Size: 388.46 MB (407,334,167 bytes)
+  Num Columns: 3
+  Columns: ['tconst', 'directors', 'writers']
+  Row count: 12,336,661
+  Sample rows (first 5):
+    ['tt0000001', 'nm0005690', '\\N']
+    ['tt0000002', 'nm0721526', '\\N']
+    ['tt0000003', 'nm0721526', 'nm0721526']
+    ['tt0000004', 'nm0721526', '\\N']
+    ['tt0000005', 'nm0005690', '\\N']
+
+=== IMDb/title.episode.tsv ===
+  Size: 238.50 MB (250,082,831 bytes)
+  Num Columns: 4
+  Columns: ['tconst', 'parentTconst', 'seasonNumber', 'episodeNumber']
+  Row count: 9,523,422
+  Sample rows (first 5):
+    ['tt0031458', 'tt32857063', '\\N', '\\N']
+    ['tt0041951', 'tt0041038', '1', '9']
+    ['tt0042816', 'tt0989125', '1', '17']
+    ['tt0042889', 'tt0989125', '\\N', '\\N']
+    ['tt0043426', 'tt0040051', '3', '42']
+
+=== IMDb/title.principals.tsv ===
+  Size: 4179.06 MB (4,382,064,068 bytes)
+  Num Columns: 6
+  Columns: ['tconst', 'ordering', 'nconst', 'category', 'job', 'characters']
+  Row count: 98,143,321
+  Sample rows (first 5):
+    ['tt0000001', '1', 'nm1588970', 'self', '\\N', '["Self"]']
+    ['tt0000001', '2', 'nm0005690', 'director', '\\N', '\\N']
+    ['tt0000001', '3', 'nm0005690', 'producer', 'producer', '\\N']
+    ['tt0000001', '4', 'nm0374658', 'cinematographer', 'director of photography', '\\N']
+    ['tt0000002', '1', 'nm0721526', 'director', '\\N', '\\N']
+
+=== IMDb/title.ratings.tsv ===
+  Size: 27.36 MB (28,686,680 bytes)
+  Num Columns: 3
+  Columns: ['tconst', 'averageRating', 'numVotes']
+  Row count: 1,643,595
+  Sample rows (first 5):
+    ['tt0000001', '5.7', '2197']
+    ['tt0000002', '5.5', '309']
+    ['tt0000003', '6.5', '2302']
+    ['tt0000004', '5.1', '196']
+    ['tt0000005', '6.2', '3033']
+
+DONE

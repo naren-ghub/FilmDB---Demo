@@ -1,0 +1,6 @@
+GroupLens/ratings.csv: size=836.45MB, header=userId,movieId,rating,timestamp
+TMDB/ratings.csv: size=676.68MB, header=userId,movieId,rating,timestamp
+TMDB/ratings_small.csv: size=2.33MB, header=userId,movieId,rating,timestamp
+TMDB/credits.csv: size=181.12MB, header=cast,crew,id
+RT/rotten_tomatoes_movie_reviews.csv: size=286.35MB, header=id,reviewId,creationDate,criticName,isTopCritic,originalScore,reviewState,publicatioName,reviewText,scoreSentiment,reviewUrl
+TMDB/TMDB_movie_dataset_v11.csv: size=583.58MB, header="id","title","vote_average","vote_count","status","release_date","revenue","runtime","adult","backdrop_path","budget","homepage","imdb_id","original_language","original_title","overview","popularity",

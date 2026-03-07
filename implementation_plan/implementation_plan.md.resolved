@@ -1,0 +1,253 @@
+# FilmDB Architecture Update — Implementation Plan
+
+## Goal
+
+Upgrade the FilmDB backend to use **local Parquet KB data** (built in the KB mapping step) as the primary data source, replacing external API calls where possible. Add 7 new KB-powered tools, a `FilmDBQueryEngine` data access layer, and update all orchestration modules to support new intents.
+
+> [!IMPORTANT]
+> **Theme Analysis Tool is deferred** — the scraping pipeline hasn't run yet, so there's no [analysis_layer](file:///D:/Evolve_Robot_Lab/Project/FilmDB_Demo/rag/kb_mapping.py#555-638) data. We'll define the schema but skip implementation.
+
+---
+
+## Current State vs. Proposed Changes
+
+| Component | Current | Proposed |
+|-----------|---------|----------|
+| Data source | External APIs (TMDB, RapidAPI, Watchmode, Serper) | **Parquet KB first**, API fallback |
+| Query engine | None — tools call APIs directly | New `FilmDBQueryEngine` reads from 6 parquet layers |
+| Tool count | 11 API-based tools | 11 existing + **7 new KB tools** |
+| Intent count | 17 | 17 existing + **4 new** (PLOT_EXPLANATION, CRITIC_SUMMARY, MOVIE_SIMILARITY, FILMOGRAPHY) |
+| Routing matrix | 17 routes → API tools | 21 routes — new intents route to KB tools |
+| Layout policy | 7 response modes | 7 existing + **3 new** (ANALYSIS_TEXT, FILMOGRAPHY_LIST, COMPARISON_TABLE) |
+| Entity resolver | Title text → pass to API | Title text → **imdb_id lookup** via movie_entity.parquet |
+
+---
+
+## Proposed Changes
+
+### RAG Query Engine
+
+#### [NEW] [filmdb_query_engine.py](file:///D:/Evolve_Robot_Lab/Project/FilmDB_Demo/rag/filmdb_query_engine.py)
+
+The central data access layer. Loads all 6 parquet files on startup, provides typed methods:
+
+- `entity_lookup(imdb_id)` → metadata from [movie_entity](file:///D:/Evolve_Robot_Lab/Project/FilmDB_Demo/rag/kb_mapping.py#85-176) + [metadata_layer](file:///D:/Evolve_Robot_Lab/Project/FilmDB_Demo/rag/kb_mapping.py#180-218)
+- `plot_analysis(imdb_id)` → text from [plot_layer](file:///D:/Evolve_Robot_Lab/Project/FilmDB_Demo/rag/kb_mapping.py#222-289)
+- `critic_summary(imdb_id)` → aggregated reviews from [review_layer](file:///D:/Evolve_Robot_Lab/Project/FilmDB_Demo/rag/kb_mapping.py#293-404)
+- `movie_similarity(imdb_id)` → tag-based similar movies from [recommendation_layer](file:///D:/Evolve_Robot_Lab/Project/FilmDB_Demo/rag/kb_mapping.py#408-499)
+- [top_rated(genre?, year?, language?, count=20)](file:///D:/Evolve_Robot_Lab/Project/FilmDB_Demo/backend/app/services/discovery_engine_service.py#81-83) → sorted from [movie_entity](file:///D:/Evolve_Robot_Lab/Project/FilmDB_Demo/rag/kb_mapping.py#85-176)
+- `person_filmography(person_name)` → films from IMDb [title.principals.tsv](file:///D:/Evolve_Robot_Lab/Project/FilmDB_Demo/kb/IMDb/title.principals.tsv/title.principals.tsv) + [title.crew.tsv](file:///D:/Evolve_Robot_Lab/Project/FilmDB_Demo/kb/IMDb/title.crew.tsv/title.crew.tsv)
+- `compare_movies(imdb_id_a, imdb_id_b)` → combined lookup for both
+- `resolve_title_to_imdb_id(title, year?)` → fuzzy match against [movie_entity](file:///D:/Evolve_Robot_Lab/Project/FilmDB_Demo/rag/kb_mapping.py#85-176)
+
+**Key design decisions:**
+1. Parquet files loaded once at startup via `pd.read_parquet()` — total ~235 MB in RAM
+2. `resolve_title_to_imdb_id` uses pre-built `title_lower → imdb_id` dict (exact match first, then fuzzy via `rapidfuzz`)
+3. For `person_filmography`: loads [title.crew.tsv](file:///D:/Evolve_Robot_Lab/Project/FilmDB_Demo/kb/IMDb/title.crew.tsv/title.crew.tsv) (388 MB) and [name.basics.tsv](file:///D:/Evolve_Robot_Lab/Project/FilmDB_Demo/kb/IMDb/name.basics.tsv/name.basics.tsv) (892 MB) — these are large files. We should build a **pre-processed person index** during the KB mapping phase instead. I will add a `person_index.parquet` layer.
+
+> [!WARNING]
+> **Person filmography** requires loading [title.crew.tsv](file:///D:/Evolve_Robot_Lab/Project/FilmDB_Demo/kb/IMDb/title.crew.tsv/title.crew.tsv) (12.3M rows, 388 MB) and [title.principals.tsv](file:///D:/Evolve_Robot_Lab/Project/FilmDB_Demo/kb/IMDb/title.principals.tsv/title.principals.tsv) (98M rows, 4.2 GB). Loading these into RAM at startup is not feasible. I propose:
+> - **Option A:** Pre-build a `person_index.parquet` during KB mapping that only contains `nconst → name, profession, list of (imdb_id, role)` for people with ≥1 movie credit. This would be ~50-100 MB.
+> - **Option B:** Use chunked reads from the TSV at query time (slow, ~2-5s per query).
+>
+> **I recommend Option A** — adds one more parquet file but keeps API response fast.
+
+---
+
+### KB-Powered Tool Services
+
+All new tools go in `backend/app/services/kb/`:
+
+#### [NEW] [kb_entity_lookup.py](file:///D:/Evolve_Robot_Lab/Project/FilmDB_Demo/backend/app/services/kb/kb_entity_lookup.py)
+- Input: `title: str`
+- Flow: `resolve_title_to_imdb_id(title)` → `entity_lookup(imdb_id)` → return metadata
+- Returns: `{title, year, genres, imdb_rating, imdb_votes, overview, popularity, tmdb_id, poster_path}`
+- **Falls back to existing API tools** if no KB match
+
+#### [NEW] [kb_plot_analysis.py](file:///D:/Evolve_Robot_Lab/Project/FilmDB_Demo/backend/app/services/kb/kb_plot_analysis.py)
+- Input: `title: str`
+- Flow: `resolve → plot_analysis(imdb_id)` → return Wikipedia plot
+- Returns: `{title, plot_text, source, wiki_page}`
+- **Note:** Plot available for ~29.7K movies (those in Wikipedia). For unmatched, returns `not_found`.
+
+#### [NEW] [kb_critic_summary.py](file:///D:/Evolve_Robot_Lab/Project/FilmDB_Demo/backend/app/services/kb/kb_critic_summary.py)
+- Input: `title: str`
+- Flow: `resolve → critic_summary(imdb_id)` → aggregates up to 30 reviews
+- Returns: `{title, review_count, avg_sentiment, top_reviews: [{critic, text, sentiment}]}`
+- **Dataset insight:** The [review_layer](file:///D:/Evolve_Robot_Lab/Project/FilmDB_Demo/rag/kb_mapping.py#293-404) has [sentiment](file:///D:/Evolve_Robot_Lab/Project/FilmDB_Demo/backend/app/services/rt_reviews_service.py#7-15) (POSITIVE/NEGATIVE/MIXED) and `is_top_critic` flags — we can prioritize top critic reviews.
+
+#### [NEW] [kb_movie_similarity.py](file:///D:/Evolve_Robot_Lab/Project/FilmDB_Demo/backend/app/services/kb/kb_movie_similarity.py)
+- Input: `title: str`
+- Flow: `resolve → movie_similarity(imdb_id)` → tag-based matching
+- Returns: `{title, recommendations: [{title, year, shared_tags, rating}]}`
+- **Dataset insight:** The [recommendation_layer](file:///D:/Evolve_Robot_Lab/Project/FilmDB_Demo/rag/kb_mapping.py#408-499) has `ml_tags` (pipe-separated user tags like "atmospheric|plot twist|dark comedy"). We can find movies with overlapping tags AND similar `ml_avg_rating`.
+
+#### [NEW] [kb_top_rated.py](file:///D:/Evolve_Robot_Lab/Project/FilmDB_Demo/backend/app/services/kb/kb_top_rated.py)
+- Input: `genre?: str, year?: str, language?: str, count?: int`
+- Flow: filters [movie_entity](file:///D:/Evolve_Robot_Lab/Project/FilmDB_Demo/rag/kb_mapping.py#85-176) by genre/year, sorts by `imdb_rating`, returns top N
+- Returns: `{movies: [{title, year, rating, genres}]}`
+- **Dataset insight:** The [regional_layer](file:///D:/Evolve_Robot_Lab/Project/FilmDB_Demo/rag/kb_mapping.py#503-551) has `language` tags — we can filter by language natively (e.g., "top rated Tamil movies" without needing an API call).
+
+#### [NEW] [kb_person_filmography.py](file:///D:/Evolve_Robot_Lab/Project/FilmDB_Demo/backend/app/services/kb/kb_person_filmography.py)
+- Input: `name: str`
+- Flow: resolve person name → lookup `person_index.parquet` → list films
+- Returns: `{name, profession, filmography: [{title, year, role, rating}]}`
+- Depends on the pre-built `person_index.parquet` (see Option A above)
+
+#### [NEW] [kb_movie_comparison.py](file:///D:/Evolve_Robot_Lab/Project/FilmDB_Demo/backend/app/services/kb/kb_movie_comparison.py)
+- Input: `title_a: str, title_b: str`
+- Flow: resolve both → get metadata, reviews, plot for each → structure side-by-side
+- Returns: `{movie_a: {...}, movie_b: {...}}` (structured, LLM formats the narrative)
+
+---
+
+### Orchestration Module Updates
+
+#### [MODIFY] [intent_agent.py](file:///D:/Evolve_Robot_Lab/Project/FilmDB_Demo/backend/app/intent_agent.py)
+Add 4 new intents to the system prompt:
+- `PLOT_EXPLANATION` — "explain the plot of X", "what is X about" (currently caught by ENTITY_LOOKUP/ANALYTICAL_EXPLANATION)
+- `CRITIC_SUMMARY` — "what do critics say about X", "reviews of X" (currently REVIEWS)
+- `MOVIE_SIMILARITY` — "movies similar to X" (currently RECOMMENDATION)
+- `FILMOGRAPHY` — "filmography of X", "movies directed by X" (currently PERSON_LOOKUP)
+
+Add classification examples for each.
+
+#### [MODIFY] [routing_matrix.py](file:///D:/Evolve_Robot_Lab/Project/FilmDB_Demo/backend/app/routing_matrix.py)
+Add new routes:
+```python
+"PLOT_EXPLANATION": {"required": ["kb_plot"], "optional": ["wikipedia"], "forbidden": []},
+"CRITIC_SUMMARY":   {"required": ["kb_critic"], "optional": ["rt_reviews"], "forbidden": []},
+"MOVIE_SIMILARITY": {"required": ["kb_similarity"], "optional": ["similarity"], "forbidden": []},
+"FILMOGRAPHY":      {"required": ["kb_filmography"], "optional": ["imdb_person"], "forbidden": []},
+```
+
+Update existing routes to prefer KB tools:
+```python
+"ENTITY_LOOKUP":  {"required": ["kb_entity"], "optional": ["imdb", "wikipedia", "watchmode"], ...},
+"TOP_RATED":      {"required": ["kb_top_rated"], "optional": ["imdb_top_rated_english"], ...},
+"COMPARISON":     {"required": ["kb_comparison"], "optional": ["web_search"], ...},
+"RECOMMENDATION": {"required": ["kb_similarity"], "optional": ["similarity"], ...},
+"REVIEWS":        {"required": ["kb_critic"], "optional": ["rt_reviews", "web_search"], ...},
+```
+
+#### [MODIFY] [governance.py](file:///D:/Evolve_Robot_Lab/Project/FilmDB_Demo/backend/app/governance.py)
+Register 7 new tools in `TOOL_REGISTRY`:
+```python
+"kb_entity":      {"name": "kb_entity",      "description": "KB movie lookup",     "required": ["title"]},
+"kb_plot":        {"name": "kb_plot",        "description": "KB Wikipedia plot",    "required": ["title"]},
+"kb_critic":      {"name": "kb_critic",      "description": "KB critic reviews",   "required": ["title"]},
+"kb_similarity":  {"name": "kb_similarity",  "description": "KB tag-based similar", "required": ["title"]},
+"kb_top_rated":   {"name": "kb_top_rated",   "description": "KB top rated filter",  "required": []},
+"kb_filmography": {"name": "kb_filmography", "description": "KB person films",      "required": ["name"]},
+"kb_comparison":  {"name": "kb_comparison",  "description": "KB movie comparison",  "required": ["title_a", "title_b"]},
+```
+
+#### [MODIFY] [conversation_engine.py](file:///D:/Evolve_Robot_Lab/Project/FilmDB_Demo/backend/app/conversation_engine.py)
+- Import and instantiate `FilmDBQueryEngine` once in `ConversationEngine.__init__`
+- Add KB tool dispatching in [_dispatch_tool()](file:///D:/Evolve_Robot_Lab/Project/FilmDB_Demo/backend/app/conversation_engine.py#510-543) for all 7 new tool names
+- Add KB tool argument building in [_build_tool_calls()](file:///D:/Evolve_Robot_Lab/Project/FilmDB_Demo/backend/app/conversation_engine.py#260-297) for each new tool
+- Update [_build_response()](file:///D:/Evolve_Robot_Lab/Project/FilmDB_Demo/backend/app/conversation_engine.py#544-582) to handle KB tool outputs
+- Update [_needs_grounding_retry()](file:///D:/Evolve_Robot_Lab/Project/FilmDB_Demo/backend/app/conversation_engine.py#348-358) to also check KB entity data
+
+#### [MODIFY] [layout_policy.py](file:///D:/Evolve_Robot_Lab/Project/FilmDB_Demo/backend/app/layout_policy.py)
+Add new response modes:
+```python
+if primary_intent == "PLOT_EXPLANATION":  return "ANALYSIS_TEXT"
+if primary_intent == "CRITIC_SUMMARY":   return "ANALYSIS_TEXT"
+if primary_intent == "FILMOGRAPHY":      return "FILMOGRAPHY_LIST"
+if primary_intent == "COMPARISON":       return "COMPARISON_TABLE"  # (upgrade from current)
+```
+
+#### [MODIFY] [tool_formatter.py](file:///D:/Evolve_Robot_Lab/Project/FilmDB_Demo/backend/app/utils/tool_formatter.py)
+Add summary formatters for each of the 7 new KB tool names.
+
+#### [MODIFY] [entity_resolver.py](file:///D:/Evolve_Robot_Lab/Project/FilmDB_Demo/backend/app/entity_resolver.py)
+- Add import of `FilmDBQueryEngine` for `resolve_title_to_imdb_id()`
+- When a movie entity is detected, try to resolve to [imdb_id](file:///D:/Evolve_Robot_Lab/Project/FilmDB_Demo/rag/kb_mapping.py#68-74) via KB lookup and attach `canonical_id` to the resolution output
+- This makes [imdb_id](file:///D:/Evolve_Robot_Lab/Project/FilmDB_Demo/rag/kb_mapping.py#68-74) available to all downstream tools without each tool duplicating the resolution
+
+---
+
+### KB Mapping Pipeline Update
+
+#### [MODIFY] [kb_mapping.py](file:///D:/Evolve_Robot_Lab/Project/FilmDB_Demo/rag/kb_mapping.py)
+Add a new Layer 1.5: `person_index.parquet`
+- Source: [title.crew.tsv](file:///D:/Evolve_Robot_Lab/Project/FilmDB_Demo/kb/IMDb/title.crew.tsv/title.crew.tsv) + [title.principals.tsv](file:///D:/Evolve_Robot_Lab/Project/FilmDB_Demo/kb/IMDb/title.principals.tsv/title.principals.tsv) + [name.basics.tsv](file:///D:/Evolve_Robot_Lab/Project/FilmDB_Demo/kb/IMDb/name.basics.tsv/name.basics.tsv)
+- Aggregates: for each `nconst`, collect `name`, `profession`, and list of [(imdb_id, category/role)](file:///D:/Evolve_Robot_Lab/Project/FilmDB_Demo/backend/app/conversation_engine.py#71-74)
+- Filters: only keep people with ≥1 movie credit (from [movie_entity](file:///D:/Evolve_Robot_Lab/Project/FilmDB_Demo/rag/kb_mapping.py#85-176))
+- Expected size: ~50-100 MB parquet
+
+---
+
+## User Review Required
+
+> [!IMPORTANT]
+> ### 1. Person Filmography — Pre-built Index
+> Loading [title.principals.tsv](file:///D:/Evolve_Robot_Lab/Project/FilmDB_Demo/kb/IMDb/title.principals.tsv/title.principals.tsv) (98M rows, 4.2 GB) at runtime is not feasible. I propose adding a pre-built `person_index.parquet` during KB mapping. This adds ~3-5 minutes to the pipeline and ~50-100 MB of disk. **Is this acceptable?**
+
+> [!IMPORTANT]
+> ### 2. KB-First vs. API-First Routing
+> The plan makes **KB tools primary** ([required](file:///D:/Evolve_Robot_Lab/Project/FilmDB_Demo/backend/app/governance.py#64-70)) and **API tools optional** (fallback). This means:
+> - Movie lookups hit local parquet first (instant) — API only used if KB has no match
+> - Similarity uses tag-based matching from ML data — TMDB API as fallback
+> - Reviews come from local RT data — RT API as fallback
+>
+> **Are you okay with KB-first routing, or do you want both KB and API to always run in parallel?**
+
+> [!IMPORTANT]
+> ### 3. Additional Changes Beyond the Update Doc
+> Beyond what the architecture doc specifies, I want to update:
+> - **Entity Resolver** — attach [imdb_id](file:///D:/Evolve_Robot_Lab/Project/FilmDB_Demo/rag/kb_mapping.py#68-74) in the resolution step so all tools get it for free
+> - **Routing Matrix** — update existing intents (ENTITY_LOOKUP, TOP_RATED, RECOMMENDATION, REVIEWS, COMPARISON) to prefer KB tools
+> - **Governance** — register all 7 new KB tools
+> - **Tool Formatter** — add LLM-friendly summaries for KB tool outputs
+>
+> Should I proceed with all of these, or keep the scope limited to only the new tools?
+
+> [!WARNING]
+> ### 4. COMPARISON Intent — Two-Entity Extraction
+> The current [EntityResolver](file:///D:/Evolve_Robot_Lab/Project/FilmDB_Demo/backend/app/entity_resolver.py#117-148) only extracts **one** entity. For `MOVIE_COMPARISON`, we need **two** movie titles. The [IntentAgent](file:///D:/Evolve_Robot_Lab/Project/FilmDB_Demo/backend/app/intent_agent.py#75-155) already extracts multiple entities in its `entities[]` array, but the resolver only uses `entities[0]`. I'll update the comparison flow to extract both entities from the intent. **Any concerns?**
+
+---
+
+## Verification Plan
+
+### Automated Tests
+
+**Existing tests** (in `backend/tests/`):
+- `test_conversation_engine.py` — tests `_build_response` mapping
+- `test_governance.py` — tests tool validation
+- `test_prompt_builder.py` — tests prompt construction
+- `test_tool_formatter.py` — tests tool summary formatting
+
+**Run existing:**
+```powershell
+cd D:\Evolve_Robot_Lab\Project\FilmDB_Demo
+python -m pytest backend/tests/ -v
+```
+
+**New tests to add:**
+1. `backend/tests/test_query_engine.py` — Unit tests for `FilmDBQueryEngine`:
+   - `test_resolve_title_exact_match` 
+   - `test_resolve_title_fuzzy_match`
+   - `test_entity_lookup_returns_metadata`
+   - `test_plot_analysis_returns_text`
+   - `test_top_rated_with_genre_filter`
+   - `test_movie_similarity_returns_matches`
+   
+2. `backend/tests/test_kb_tools.py` — Unit tests for KB tool services:
+   - Each tool's `run()` with known titles (e.g., "Inception", "Interstellar")
+   - Each tool's `run()` with unknown titles → `not_found`
+
+3. Update `test_conversation_engine.py` to cover KB tool dispatch
+
+### Manual Verification
+- Start the backend (`uvicorn`) and use the chat UI
+- Test queries like:
+  - "Tell me about Inception" → should return KB data with rating, overview
+  - "Explain the plot of The Shawshank Redemption" → should return Wikipedia plot
+  - "What do critics say about The Dark Knight" → should return RT reviews summary
+  - "Movies similar to Interstellar" → should return tag-based recommendations
+  - "Top rated Action movies" → should return KB-filtered list
+  - "Christopher Nolan filmography" → should return film list from person_index
+  - "Compare Inception and Interstellar" → should return side-by-side data

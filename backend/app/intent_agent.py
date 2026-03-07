@@ -24,7 +24,8 @@ Valid primary intents:
 ENTITY_LOOKUP, ANALYTICAL_EXPLANATION, AVAILABILITY, RECOMMENDATION, DOWNLOAD,
 LEGAL_DOWNLOAD, ILLEGAL_DOWNLOAD_REQUEST, STREAMING_AVAILABILITY,
 REVIEWS, TRENDING, UPCOMING, TOP_RATED, STREAMING_DISCOVERY, COMPARISON,
-PERSON_LOOKUP, AWARD_LOOKUP, GREETING, GENERAL_CONVERSATION
+PERSON_LOOKUP, AWARD_LOOKUP, GREETING, GENERAL_CONVERSATION,
+PLOT_EXPLANATION, CRITIC_SUMMARY, MOVIE_SIMILARITY, FILMOGRAPHY
 
 Classification rules:
 - "hi", "hello", "hey", greetings → GREETING (confidence: 100)
@@ -32,16 +33,20 @@ Classification rules:
 - "tell me about <movie>" → ENTITY_LOOKUP
 - "tell me about <person>" → PERSON_LOOKUP
 - "where can I watch <movie>" → STREAMING_AVAILABILITY
-- "movies similar to <movie>" → RECOMMENDATION
+- "movies similar to <movie>" → MOVIE_SIMILARITY
 - "trending movies", "what's popular" → TRENDING
 - "top rated movies" → TOP_RATED
 - "upcoming releases" → UPCOMING
 - "oscar", "nominations", "awards" → AWARD_LOOKUP
-- "review of <movie>" → REVIEWS
+- "review of <movie>", "what do critics say about <movie>" → CRITIC_SUMMARY
 - "what's new on netflix" → STREAMING_DISCOVERY
 - "download <movie>" → DOWNLOAD
+- "explain the plot of <movie>", "plot of <movie>" → PLOT_EXPLANATION
+- "filmography of <person>", "movies directed by <person>" → FILMOGRAPHY
+- "compare <movie> and <movie>" → COMPARISON
 - When a specific movie title is mentioned → always extract it as an entity
 - When a specific person name is mentioned → always extract it as an entity
+- For COMPARISON: extract BOTH movie entities
 
 Entity format: [{"type": "movie"|"person"|"genre"|"year"|"platform", "value": "..."}]
 
@@ -54,12 +59,16 @@ Examples:
 - "upcoming releases" → {"primary_intent": "UPCOMING", "secondary_intents": [], "entities": [], "confidence": 95}
 - "where can I stream The Batman" → {"primary_intent": "STREAMING_AVAILABILITY", "secondary_intents": [], "entities": [{"type": "movie", "value": "The Batman"}], "confidence": 95}
 - "oscar nominations 2026" → {"primary_intent": "AWARD_LOOKUP", "secondary_intents": [], "entities": [{"type": "year", "value": "2026"}], "confidence": 95}
-- "movies like Interstellar" → {"primary_intent": "RECOMMENDATION", "secondary_intents": [], "entities": [{"type": "movie", "value": "Interstellar"}], "confidence": 90}
+- "movies like Interstellar" → {"primary_intent": "MOVIE_SIMILARITY", "secondary_intents": [], "entities": [{"type": "movie", "value": "Interstellar"}], "confidence": 90}
 - "what are the current trending films" → {"primary_intent": "TRENDING", "secondary_intents": [], "entities": [], "confidence": 95}
-- "stanley kubrick filmography" → {"primary_intent": "PERSON_LOOKUP", "secondary_intents": [], "entities": [{"type": "person", "value": "Stanley Kubrick"}], "confidence": 95}
+- "stanley kubrick filmography" → {"primary_intent": "FILMOGRAPHY", "secondary_intents": [], "entities": [{"type": "person", "value": "Stanley Kubrick"}], "confidence": 95}
 - "give overview of kottukkali" → {"primary_intent": "ENTITY_LOOKUP", "secondary_intents": [], "entities": [{"type": "movie", "value": "Kottukkali"}], "confidence": 90}
 - "suggest good movies released past 2 weeks" → {"primary_intent": "TRENDING", "secondary_intents": ["RECOMMENDATION"], "entities": [], "confidence": 90}
 - "Why is Kubrick's A Clockwork Orange controversial" → {"primary_intent": "ANALYTICAL_EXPLANATION", "secondary_intents": ["ENTITY_LOOKUP"], "entities": [{"type": "movie", "value": "A Clockwork Orange"}, {"type": "person", "value": "Stanley Kubrick"}], "confidence": 90}
+- "explain the plot of Inception" → {"primary_intent": "PLOT_EXPLANATION", "secondary_intents": [], "entities": [{"type": "movie", "value": "Inception"}], "confidence": 95}
+- "what do critics say about The Dark Knight" → {"primary_intent": "CRITIC_SUMMARY", "secondary_intents": [], "entities": [{"type": "movie", "value": "The Dark Knight"}], "confidence": 95}
+- "movies directed by Martin Scorsese" → {"primary_intent": "FILMOGRAPHY", "secondary_intents": [], "entities": [{"type": "person", "value": "Martin Scorsese"}], "confidence": 95}
+- "compare Inception and Interstellar" → {"primary_intent": "COMPARISON", "secondary_intents": [], "entities": [{"type": "movie", "value": "Inception"}, {"type": "movie", "value": "Interstellar"}], "confidence": 95}
 
 IMPORTANT: Always return confidence >= 70 for any film-related query.
 Return confidence 100 for greetings.

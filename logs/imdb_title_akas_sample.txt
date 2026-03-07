@@ -1,0 +1,4 @@
+titleId,ordering,title,region,language,types,attributes,isOriginalTitle
+['tt0000001', '1', 'Carmencita', '\\N', '\\N', 'original', '\\N']
+['tt0000001', '2', 'Carmencita', 'DE', '\\N', '\\N', 'literal title']
+['tt0000001', '3', 'Carmencita', 'US', '\\N', 'imdbDisplay', '\\N']

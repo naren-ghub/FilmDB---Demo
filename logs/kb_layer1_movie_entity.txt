@@ -1,0 +1,13 @@
+19:53:46 | INFO    | \u2550\u2550\u2550 Layer 1: movie_entity (IMDb master) \u2550\u2550\u2550
+19:53:46 | INFO    |   Loading title.basics.tsv à
+19:54:17 | INFO    |   Loaded 12,336,661 total title rows
+19:54:18 | INFO    |   Filtered to 730,319 movies (non-adult)
+19:54:18 | INFO    |   Merging IMDb ratings à
+19:54:20 | INFO    |   Ratings merged: 335,434 rated movies
+19:54:20 | INFO    |   Cross-referencing TMDB IDs à
+19:54:30 | INFO    |   TMDB IDs matched: 347,413
+19:54:30 | INFO    |   Cross-referencing MovieLens IDs à
+19:54:32 | INFO    |   MovieLens IDs matched: 71,337
+19:54:33 | INFO    |   \u2705 Saved movie_entity.parquet: 730,319 rows, 21.5 MB
+19:54:33 | INFO    |   Layer 1 done in 47.2s
+

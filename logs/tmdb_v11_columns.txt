@@ -1,0 +1,5 @@
+TMDB v11 columns (24): ['id', 'title', 'vote_average', 'vote_count', 'status', 'release_date', 'revenue', 'runtime', 'adult', 'backdrop_path', 'budget', 'homepage', 'imdb_id', 'original_language', 'original_title', 'overview', 'popularity', 'poster_path', 'tagline', 'genres', 'production_companies', 'production_countries', 'spoken_languages', 'keywords']
+Sample rows:
+['27205', 'Inception', '8.364', '34495', 'Released', '2010-07-15', '825532764', '148']
+['157336', 'Interstellar', '8.417', '32571', 'Released', '2014-11-05', '701729206', '169']
+['155', 'The Dark Knight', '8.512', '30619', 'Released', '2008-07-16', '1004558444', '152']

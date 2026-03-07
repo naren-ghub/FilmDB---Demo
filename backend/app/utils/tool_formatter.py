@@ -1,5 +1,6 @@
 
 
+
 def normalize_tool_output(status: str, data: dict) -> dict:
     if status not in ("success", "not_found", "error"):
         status = "error"
@@ -62,6 +63,78 @@ def summarize_tool_data(tool_name: str, output: dict) -> str:
         sentiment = data.get("sentiment")
         score = data.get("score")
         return f"source: rt_reviews sentiment: {sentiment} score: {score}"
+
+    # ── KB tool summaries ────────────────────────────────────────────────
+    if tool_name == "kb_entity":
+        title = data.get("title")
+        year = data.get("year")
+        rating = data.get("imdb_rating")
+        overview = data.get("overview", "")
+        genres = data.get("genres", "")
+        parts = [f"source: kb_entity title: {title} year: {year} rating: {rating}"]
+        if genres:
+            parts.append(f"genres: {genres}")
+        if overview:
+            parts.append(f"overview: {str(overview)[:200]}")
+        return " | ".join(parts)
+
+    if tool_name == "kb_plot":
+        title = data.get("title", "")
+        plot = data.get("plot_text", "")
+        return f"source: kb_plot title: {title} plot: {str(plot)[:300]}"
+
+    if tool_name == "kb_critic":
+        title = data.get("title", "")
+        count = data.get("review_count", 0)
+        sentiments = data.get("sentiment_breakdown", {})
+        reviews = data.get("reviews", [])
+        review_texts = [r.get("review_text", "")[:100] for r in reviews[:5]]
+        parts = [f"source: kb_critic title: {title} review_count: {count} sentiments: {sentiments}"]
+        for i, rt in enumerate(review_texts):
+            parts.append(f"review_{i+1}: {rt}")
+        return " | ".join(parts)
+
+    if tool_name == "kb_similarity":
+        recs = data.get("recommendations", [])
+        titles = [r.get("title", "Unknown") for r in recs[:10]]
+        tags = data.get("source_tags", [])
+        return f"source: kb_similarity tags: {', '.join(tags[:5])} recommendations: {', '.join(titles)}"
+
+    if tool_name == "kb_top_rated":
+        movies = data.get("movies", [])
+        titles = [f"{m.get('title')} ({m.get('rating')})" for m in movies[:10]]
+        filters = data.get("filters", {})
+        return f"source: kb_top_rated filters: {filters} movies: {', '.join(titles)}"
+
+    if tool_name == "kb_filmography":
+        name = data.get("name")
+        prof = data.get("professions", "")
+        by_role = data.get("filmography_by_role", {})
+        parts = [f"source: kb_filmography name: {name} profession: {prof}"]
+        role_order = ["director", "writer", "producer", "actor", "actress",
+                      "composer", "cinematographer", "editor", "self",
+                      "archive_footage", "archive_sound"]
+        for role in role_order:
+            entries = by_role.get(role, [])
+            if entries:
+                titles = [f"{f.get('title')} ({f.get('year')}, rating={f.get('rating')})"
+                          for f in entries[:15] if f.get("title")]
+                parts.append(f"{role}: {', '.join(titles)}")
+        # Fallback to flat list if grouped data is missing
+        if not by_role:
+            films = data.get("filmography", [])
+            film_titles = [f"{f.get('title')} ({f.get('year')})" for f in films[:10] if f.get("title")]
+            parts.append(f"films: {', '.join(film_titles)}")
+        return " | ".join(parts)
+
+    if tool_name == "kb_comparison":
+        a = data.get("movie_a", {})
+        b = data.get("movie_b", {})
+        return (
+            f"source: kb_comparison "
+            f"movie_a: {a.get('title')} ({a.get('year')}) rating: {a.get('imdb_rating')} | "
+            f"movie_b: {b.get('title')} ({b.get('year')}) rating: {b.get('imdb_rating')}"
+        )
 
     return f"{tool_name}: ok"
 
