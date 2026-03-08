@@ -28,3 +28,5 @@ rag/scraped_articles/
 
 Response generation documentation/
 api_tests/
+
+implementation_plan/
