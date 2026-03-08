@@ -12,6 +12,7 @@ Layers used:
     - recommendation_layer.parquet → MovieLens tags/ratings (similarity)
     - regional_layer.parquet       → Indian cinema metadata
     - person_index.parquet         → Person filmography index
+    - analysis_layer.jsonl         → Scraped film analysis articles (RAG corpus)
 """
 
 import json
@@ -44,6 +45,22 @@ class FilmDBQueryEngine:
         self._regional = self._load("regional_layer.parquet")
         self._persons = self._load("person_index.parquet")
 
+        # ── Load analysis layer (JSONL, not Parquet) ───────────────────────
+        self._analysis: list[dict] = []
+        _analysis_path = _PROJECT_ROOT / "rag" / "scraped_articles" / "analysis_layer.jsonl"
+        if _analysis_path.exists():
+            with open(_analysis_path, "r", encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if line:
+                        try:
+                            self._analysis.append(json.loads(line))
+                        except json.JSONDecodeError:
+                            continue
+            log.info("  Loaded analysis_layer.jsonl: %s records", f"{len(self._analysis):,}")
+        else:
+            log.info("  analysis_layer.jsonl not found — analysis search disabled")
+
         # ── Build lookup indices (vectorized for speed) ────────────────────
         self._title_year_index: dict[str, str] = {}
         self._title_index: dict[str, str] = {}
@@ -70,11 +87,12 @@ class FilmDBQueryEngine:
             self._person_name_index = dict(zip(names_lower, valid["nconst"]))
 
         log.info(
-            "FilmDBQueryEngine: ready — %s movies, %s persons, %s plots, %s reviews",
+            "FilmDBQueryEngine: ready — %s movies, %s persons, %s plots, %s reviews, %s analysis",
             f"{len(self._movie_entity):,}" if self._movie_entity is not None else "0",
             f"{len(self._persons):,}" if self._persons is not None else "0",
             f"{len(self._plots):,}" if self._plots is not None else "0",
             f"{len(self._reviews):,}" if self._reviews is not None else "0",
+            f"{len(self._analysis):,}",
         )
 
     @classmethod
@@ -263,15 +281,22 @@ class FilmDBQueryEngine:
         scores.sort(key=lambda x: (-x["overlap_count"], -(x["ml_avg_rating"] or 0)))
         top_matches = scores[:top_n]
 
-        # Enrich with titles from movie_entity
+        # Enrich with titles from movie_entity and posters from metadata
         if self._movie_entity is not None:
             me_dict = dict(zip(self._movie_entity["imdb_id"], self._movie_entity["title"]))
             me_year = dict(zip(self._movie_entity["imdb_id"], self._movie_entity["year"]))
             me_genres = dict(zip(self._movie_entity["imdb_id"], self._movie_entity["genres"]))
+            
+            # Poster mapping
+            poster_dict = {}
+            if self._metadata is not None:
+                poster_dict = dict(zip(self._metadata["imdb_id"], self._metadata["poster_path"]))
+
             for m in top_matches:
                 m["title"] = me_dict.get(m["imdb_id"])
                 m["year"] = me_year.get(m["imdb_id"])
                 m["genres"] = me_genres.get(m["imdb_id"])
+                m["poster_path"] = poster_dict.get(m["imdb_id"])
 
         return {
             "imdb_id": imdb_id,
@@ -467,3 +492,53 @@ class FilmDBQueryEngine:
                 }
 
         return result
+
+    # ─── Analysis Search ─────────────────────────────────────────────────────
+
+    def analysis_search(self, imdb_id: str, max_results: int = 10) -> list[dict[str, Any]]:
+        """Return analysis articles linked to a given IMDb ID."""
+        results = []
+        for article in self._analysis:
+            if imdb_id in article.get("imdb_ids", []):
+                results.append({
+                    "source": article.get("source"),
+                    "knowledge_type": article.get("knowledge_type"),
+                    "title": article.get("title"),
+                    "author": article.get("author"),
+                    "publication_date": article.get("publication_date"),
+                    "url": article.get("url"),
+                    "chunks": article.get("chunks", []),
+                    "text_preview": (article.get("text", "")[:300] + "…")
+                                    if article.get("text") else None,
+                })
+                if len(results) >= max_results:
+                    break
+        return results
+
+    def analysis_search_by_person(
+        self, person_name: str, max_results: int = 10
+    ) -> list[dict[str, Any]]:
+        """Return analysis articles mentioning a person in detected entities."""
+        name_lower = person_name.lower().strip()
+        results = []
+        for article in self._analysis:
+            entities = article.get("entities", {})
+            all_people = (
+                entities.get("directors", []) + entities.get("actors", [])
+            )
+            if any(name_lower in p.lower() for p in all_people):
+                results.append({
+                    "source": article.get("source"),
+                    "knowledge_type": article.get("knowledge_type"),
+                    "title": article.get("title"),
+                    "author": article.get("author"),
+                    "url": article.get("url"),
+                    "matched_entities": [
+                        p for p in all_people if name_lower in p.lower()
+                    ],
+                    "text_preview": (article.get("text", "")[:300] + "…")
+                                    if article.get("text") else None,
+                })
+                if len(results) >= max_results:
+                    break
+        return results
