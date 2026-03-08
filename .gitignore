@@ -22,4 +22,8 @@ claude_agent_report.md
 *.parquet
 rag/processed_dataset/
 rag/raw_dataset/
+rag/raw_dataset.zip
+raw_dataset.zip
 rag/scraped_articles/
+
+Response generation documentation/
