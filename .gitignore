@@ -27,3 +27,4 @@ raw_dataset.zip
 rag/scraped_articles/
 
 Response generation documentation/
+api_tests/
