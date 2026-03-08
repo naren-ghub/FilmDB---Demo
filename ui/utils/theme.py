@@ -13,7 +13,7 @@ BG_PRIMARY    = "#0d0d0d"
 BG_SURFACE    = "#141422"
 BG_CARD       = "#1a1a2e"
 BG_ELEVATED   = "#22223a"
-BG_SIDEBAR    = "#111120"
+BG_SIDEBAR    = "#0d0d0d"
 BG_INPUT      = "#1e1e32"
 
 TEXT_PRIMARY   = "#eaeaea"
@@ -25,7 +25,7 @@ ACCENT_BLUE   = "#3a7bd5"
 ACCENT_HOVER  = "#e2c044"
 
 USER_BUBBLE   = "linear-gradient(135deg, #1b3a6b 0%, #22447a 100%)"
-ASST_BUBBLE   = "#1e1e30"
+ASST_BUBBLE   = "#111"
 
 BORDER_SUBTLE = "rgba(255,255,255,0.06)"
 SHADOW_SM     = "0 1px 3px rgba(0,0,0,.35)"
@@ -65,9 +65,25 @@ def load_css() -> None:
     ::-webkit-scrollbar-thumb:hover {{ background: {TEXT_SECONDARY}; }}
 
     /* ═══════════════════  HIDE DEFAULTS  ═══════════════════ */
-    #MainMenu, footer, header,
-    [data-testid="stDeployButton"],
-    [data-testid="stToolbar"] {{ display: none !important; }}
+    #MainMenu, footer, [data-testid="stDeployButton"] {{ display: none !important; }}
+    
+    header {{
+        background-color: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
+        height: 3rem !important; /* Ensure header has height for toggle */
+    }}
+    
+    /* Ensure the sidebar toggle icon is visible and consistent with theme */
+    button[data-testid="stSidebarCollapseButton"] {{
+        color: {TEXT_SECONDARY} !important;
+        background-color: transparent !important;
+        z-index: 1000001 !important;
+    }}
+    button[data-testid="stSidebarCollapseButton"]:hover {{
+        color: {ACCENT_GOLD} !important;
+        background-color: rgba(255,255,255,0.05) !important;
+    }}
 
     /* ═══════════════════  SIDEBAR  ═══════════════════ */
     section[data-testid="stSidebar"] {{

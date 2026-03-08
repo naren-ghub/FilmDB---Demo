@@ -1,5 +1,5 @@
 """
-🍿 FilmDB – Demo
+🍿 FilmDB
 ==================
 Production Streamlit entry‑point.
 
@@ -11,7 +11,7 @@ import streamlit as st
 
 # ── page config must be the very first Streamlit call ──
 st.set_page_config(
-    page_title="FilmDB - DEMO",
+    page_title="FilmDB",
     page_icon="🍿",
     layout="wide",
     initial_sidebar_state="expanded",

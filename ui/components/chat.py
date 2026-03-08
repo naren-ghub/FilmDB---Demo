@@ -154,53 +154,58 @@ def _render_chat_history() -> None:
         )
         return
 
-    # ── render list (capped at 30) ──
-    for sid, meta in all_sessions[:30]:
-        title = meta.get("title", "Untitled")
-        msg_count = len(meta.get("messages", []))
-        is_active = sid == st.session_state.session_id
+    # ── render list (scrollable container) ──
+    history_container = st.container(height=450, border=False)
+    with history_container:
+        for sid, meta in all_sessions[:40]:
+            title = meta.get("title", "Untitled")
+            # Truncate title for professional look
+            display_title = (title[:25] + '...') if len(title) > 28 else title
+            
+            msg_count = len(meta.get("messages", []))
+            is_active = sid == st.session_state.session_id
 
-        # Highlight active session
-        active_style = "color:#c9a227;font-weight:600;" if is_active else ""
-        indicator = "▶ " if is_active else "💬 "
+            # Highlight active session
+            active_style = "color:#c9a227;font-weight:600;" if is_active else ""
+            indicator = "▶ " if is_active else "💬 "
 
-        col_title, col_edit, col_del = st.columns([5, 1, 1])
-        with col_title:
-            if st.button(
-                f"{indicator}{title}",
-                key=f"hist_{sid}",
-                use_container_width=True,
-                help=f"{msg_count} messages",
-            ):
-                restore_chat_session(sid)
-                st.rerun()
-        with col_edit:
-            if st.button("✏️", key=f"edit_{sid}", help="Rename"):
-                st.session_state[f"renaming_{sid}"] = True
-                st.rerun()
-        with col_del:
-            if st.button("🗑", key=f"del_{sid}", help="Delete"):
-                delete_chat_session(sid)
-                st.rerun()
-
-        # Inline rename form
-        if st.session_state.get(f"renaming_{sid}"):
-            new_title = st.text_input(
-                "New title",
-                value=title,
-                key=f"rename_input_{sid}",
-                label_visibility="collapsed",
-            )
-            col_save, col_cancel = st.columns(2)
-            with col_save:
-                if st.button("Save", key=f"rename_save_{sid}", use_container_width=True):
-                    rename_chat_session(sid, new_title)
-                    st.session_state.pop(f"renaming_{sid}", None)
+            col_title, col_edit, col_del = st.columns([5, 1, 1])
+            with col_title:
+                if st.button(
+                    f"{indicator}{display_title}",
+                    key=f"hist_{sid}",
+                    use_container_width=True,
+                    help=f"{title} ({msg_count} messages)",
+                ):
+                    restore_chat_session(sid)
                     st.rerun()
-            with col_cancel:
-                if st.button("Cancel", key=f"rename_cancel_{sid}", use_container_width=True):
-                    st.session_state.pop(f"renaming_{sid}", None)
+            with col_edit:
+                if st.button("✏️", key=f"edit_{sid}", help="Rename"):
+                    st.session_state[f"renaming_{sid}"] = True
                     st.rerun()
+            with col_del:
+                if st.button("🗑", key=f"del_{sid}", help="Delete"):
+                    delete_chat_session(sid)
+                    st.rerun()
+
+            # Inline rename form
+            if st.session_state.get(f"renaming_{sid}"):
+                new_title = st.text_input(
+                    "New title",
+                    value=title,
+                    key=f"rename_input_{sid}",
+                    label_visibility="collapsed",
+                )
+                col_save, col_cancel = st.columns(2)
+                with col_save:
+                    if st.button("Save", key=f"rename_save_{sid}", use_container_width=True):
+                        rename_chat_session(sid, new_title)
+                        st.session_state.pop(f"renaming_{sid}", None)
+                        st.rerun()
+                with col_cancel:
+                    if st.button("Cancel", key=f"rename_cancel_{sid}", use_container_width=True):
+                        st.session_state.pop(f"renaming_{sid}", None)
+                        st.rerun()
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -370,7 +375,7 @@ def render_chat_interface() -> None:
     with title_col:
         st.markdown(
             "<div class='filmdb-title'>🍿 <span>Film</span>DB "
-            "<span style='font-size:0.55em;color:#6c6c80;'>DEMO</span></div>",
+            "<span style='font-size:0.55em;color:#6c6c80;'></span></div>",
             unsafe_allow_html=True,
         )
     with menu_col:
@@ -573,18 +578,37 @@ def _render_assistant_response(msg: dict) -> None:
 
     # ── FULL_CARD: poster + metadata side-by-side ──
     if mode == "FULL_CARD" and poster:
-        col_poster, col_text = st.columns([1, 2.5], gap="medium")
-        with col_poster:
-            st.markdown("<div class='filmdb-poster-card'>", unsafe_allow_html=True)
-            st.image(poster, use_container_width=True)
-            st.markdown("</div>", unsafe_allow_html=True)
-        with col_text:
-            st.markdown(
-                f"<div class='filmdb-asst-msg'>{md_to_html(text)}</div>",
-                unsafe_allow_html=True,
-            )
-            if streaming:
-                _render_platforms(streaming)
+        title = msg.get("title", "Unknown Title")
+        director = msg.get("director", "Unknown Director")
+        year = msg.get("year", "")
+        rating = msg.get("rating", "N/A")
+        
+        platforms_str = ", ".join([s.get("name") if isinstance(s, dict) else str(s) for s in streaming]) if streaming else "Not available to stream"
+        
+        import textwrap
+        
+        hide_footer = mode in ("AVAILABILITY_FOCUS", "EXPLANATION_PLUS_AVAILABILITY") or not streaming
+        footer_line = ""
+        if not hide_footer:
+            footer_line = f'<div style="margin-top:15px; padding-top:10px; border-top: 1px solid #333; clear: both;"><b style="color:#c9a227;">Where to Watch:</b> {platforms_str}</div>'
+        
+        # We use a float-based layout so text wraps around the poster.
+        html = textwrap.dedent(f"""
+            <div style="padding:18px; border-radius:12px; background-color:#111; border:1px solid #333; margin-bottom:20px; overflow: auto;">
+                <div style="float: left; margin: 0 20px 10px 0;">
+                    <img src="{poster}" style="width:200px; border-radius:8px; display: block;">
+                </div>
+                <div style="color: white;">
+                    <h2 style="margin-bottom:5px; margin-top:0;">{title}</h2>
+                    <p style="color:#bbb;margin-top:0;">{director} • {year} • ⭐ {rating}</p>
+                    <div style="line-height:1.6; font-size: 0.95rem;">
+                        {md_to_html(text)}
+                    </div>
+                    {footer_line}
+                </div>
+            </div>
+        """).strip()
+        st.markdown(html, unsafe_allow_html=True)
     else:
         # ── text bubble for all other modes ──
         st.markdown(
@@ -634,12 +658,7 @@ def _render_platforms(streaming: list) -> None:
 
 
 def _render_recommendations(recs: list) -> None:
-    st.markdown(
-        "<p style='font-size:0.78rem;color:#a0a0b8;font-weight:600;"
-        "margin:0.8rem 0 0.4rem;text-transform:uppercase;letter-spacing:0.06em;'>"
-        "You might also like</p>",
-        unsafe_allow_html=True,
-    )
+    st.markdown("### Recommended Movies")
     cols = st.columns(min(len(recs), 3), gap="small")
     for i, rec in enumerate(recs[:6]):
         with cols[i % 3]:
@@ -711,8 +730,16 @@ def _process_pending_message() -> None:
     sid = st.session_state.session_id
     sessions = st.session_state.get("chat_sessions", {})
     if sid not in sessions:
-        first_msg = st.session_state.messages[0].get("content", "Untitled")
-        title = first_msg[:48] + ("…" if len(first_msg) > 48 else "")
+        first_user_msg = next((m.get("content", "") for m in st.session_state.messages if m.get("role") == "user"), "")
+        if not first_user_msg:
+            title = "New Conversation"
+        else:
+            clean_msg = first_user_msg.strip(" ?.!\"'")
+            if len(clean_msg) > 30:
+                title = clean_msg[:28].rsplit(" ", 1)[0] + "…"
+            else:
+                title = clean_msg
+            title = title.capitalize()
     else:
         title = sessions[sid].get("title", "Untitled")
     sessions[sid] = {
