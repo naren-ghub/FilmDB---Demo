@@ -31,3 +31,6 @@ api_tests/
 
 implementation_plan/
 logs/
+response_chatgpt/
+streamlit_chat inteface/
+
