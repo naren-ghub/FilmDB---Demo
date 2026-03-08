@@ -2,7 +2,7 @@ import os
 
 from dotenv import load_dotenv
 
-load_dotenv()
+load_dotenv(override=True)
 
 class Settings:
     GROQ_API_KEY = os.getenv("GROQ_API_KEY")
@@ -12,6 +12,7 @@ class Settings:
     RAPIDAPI_KEY = os.getenv("RAPIDAPI_KEY")
     IMDB_HOST = os.getenv("IMDB_HOST", "imdb8.p.rapidapi.com")
     IMDB236_HOST = os.getenv("IMDB236_HOST", "imdb236.p.rapidapi.com")
+    IMDB232_HOST = os.getenv("IMDB232_HOST", "imdb232.p.rapidapi.com")
     IMDB_TOP_RATED_PATH = os.getenv("IMDB_TOP_RATED_PATH", "/api/imdb/top-rated-english")
     IMDB_TRENDING_TAMIL_PATH = os.getenv("IMDB_TRENDING_TAMIL_PATH", "/api/imdb/trending-tamil")
     IMDB_UPCOMING_PATH = os.getenv("IMDB_UPCOMING_PATH", "/api/imdb/upcoming")
