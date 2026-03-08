@@ -33,4 +33,6 @@ implementation_plan/
 logs/
 response_chatgpt/
 streamlit_chat inteface/
+check.txt
+code_snippets.txt
 
