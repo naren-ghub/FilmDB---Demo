@@ -48,7 +48,7 @@ async def _get(client: httpx.AsyncClient, path: str, params: dict | None = None)
     raise httpx.ConnectError(f"All {_MAX_RETRIES + 1} attempts failed: {last_error}")
 
 
-async def run(title: str) -> dict:
+async def run(title: str, year: str | int | None = None) -> dict:
     """Search for a movie by title and return rich metadata."""
     if not settings.TMDB_API_KEY:
         return normalize_tool_output("error", {"reason": "missing_tmdb_api_key"})
@@ -57,18 +57,55 @@ async def run(title: str) -> dict:
 
     async with httpx.AsyncClient(timeout=settings.HTTP_TIMEOUT_SECONDS) as client:
         try:
-            # Step 1: Search for the movie
-            search_data = await _get(client, "/search/movie", {
+            search_params = {
                 "query": clean_title,
                 "include_adult": "false",
                 "language": "en-US",
                 "page": 1,
-            })
+            }
+            if year:
+                search_params["year"] = str(year)
+
+            # Step 1: Search for the movie
+            search_data = await _get(client, "/search/movie", search_params)
             results = search_data.get("results", [])
+            
+            # Disambiguation logic: If multiple hits exist with similar popularity or different years
+            if not year and len(results) > 1:
+                # Check for popular candidates (e.g. popularity > 5 or just top 3)
+                candidates = []
+                for r in results[:5]:
+                    cand_year = (r.get("release_date") or "")[:4]
+                    candidates.append({
+                        "title": r.get("title"),
+                        "year": cand_year,
+                        "tmdb_id": r.get("id"),
+                        "overview": r.get("overview", "")[:100] + "..."
+                    })
+                
+                # If we have multiple significant results, we might want to disambiguate
+                # LOWERED THRESHOLD: If results are somewhat popular or very similar in popularity
+                if len(results) > 1:
+                     p1 = results[0].get("popularity", 0)
+                     p2 = results[1].get("popularity", 0)
+                     # If the second hit is at least 30% as popular as the first, or both are popular
+                     if p2 > 5 or (p1 > 0 and p2 / p1 > 0.3):
+                         return normalize_tool_output("disambiguation", {
+                             "title": clean_title,
+                             "candidates": candidates,
+                             "reason": "multiple_likely_matches"
+                         })
+
+            if not results and year:
+                # Retry without year if no exact match
+                search_params.pop("year")
+                search_data = await _get(client, "/search/movie", search_params)
+                results = search_data.get("results", [])
+
             if not results:
                 return normalize_tool_output("not_found", {"title": clean_title})
 
-            # Pick the best result (first is usually best for TMDB)
+            # Pick the best result
             movie = results[0]
             movie_id = movie.get("id")
 

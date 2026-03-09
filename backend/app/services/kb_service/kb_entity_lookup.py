@@ -29,4 +29,11 @@ async def run(title: str) -> dict[str, Any]:
     if not result:
         return {"status": "not_found", "data": {"title": title, "imdb_id": imdb_id}}
 
+    # Enrich with local streaming availability
+    streaming_info = engine.is_streaming(imdb_id)
+    if streaming_info:
+        result["streaming"] = streaming_info.get("platforms", [])
+        result["age_rating"] = streaming_info.get("age_rating")
+        result["is_tv_show"] = streaming_info.get("is_tv_show", False)
+
     return {"status": "success", "data": result}

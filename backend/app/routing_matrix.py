@@ -4,13 +4,13 @@ from typing import Any
 ROUTING_MATRIX: dict[str, dict[str, list[str]]] = {
     # ── KB-first routes (local data primary, API fallback) ───────────────
     "ENTITY_LOOKUP": {
-        "required": ["kb_entity"],
-        "optional": ["imdb", "wikipedia", "watchmode"],
+        "required": ["kb_entity","tmdb"],
+        "optional": ["wikipedia"],
         "forbidden": ["archive"],
     },
     "ANALYTICAL_EXPLANATION": {
-        "required": ["kb_entity", "kb_plot"],
-        "optional": ["wikipedia", "web_search"],
+        "required": ["kb_plot", "kb_film_analysis", "cinema_search"],
+        "optional": ["kb_critic", "tmdb", "wikipedia"],
         "forbidden": ["archive"],
     },
     "PLOT_EXPLANATION": {
@@ -20,64 +20,74 @@ ROUTING_MATRIX: dict[str, dict[str, list[str]]] = {
     },
     "CRITIC_SUMMARY": {
         "required": ["kb_critic"],
-        "optional": ["kb_entity", "rt_reviews", "web_search"],
+        "optional": ["kb_entity", "tmdb", "cinema_search"],
         "forbidden": [],
     },
     "MOVIE_SIMILARITY": {
         "required": ["kb_similarity"],
-        "optional": ["similarity"],
+        "optional": [],
         "forbidden": [],
     },
     "RECOMMENDATION": {
         "required": ["kb_similarity"],
-        "optional": ["similarity", "web_search"],
+        "optional": ["cinema_search"],
         "forbidden": [],
     },
     "REVIEWS": {
         "required": ["kb_critic"],
-        "optional": ["rt_reviews", "web_search"],
+        "optional": ["cinema_search"],
         "forbidden": [],
     },
     "TOP_RATED": {
         "required": ["kb_top_rated"],
-        "optional": ["imdb_top_rated_english"],
+        "optional": ["cinema_search"],
         "forbidden": [],
     },
     "COMPARISON": {
-        "required": ["kb_comparison"],
-        "optional": ["web_search"],
+        "required": ["kb_comparison", "cinema_search"],
+        "optional": ["wikipedia", "kb_filmography", "tmdb"],
         "forbidden": ["archive"],
     },
     "FILMOGRAPHY": {
-        "required": ["kb_filmography"],
-        "optional": ["imdb_person", "wikipedia"],
+        "required": ["kb_filmography", "wikipedia"],
+        "optional": ["tmdb"],
         "forbidden": [],
     },
     "PERSON_LOOKUP": {
-        "required": ["kb_filmography"],
-        "optional": ["imdb_person", "wikipedia", "web_search"],
+        "required": ["kb_filmography", "wikipedia"],
+        "optional": ["tmdb", "kb_film_analysis"],
+        "forbidden": [],
+    },
+    "FILM_ANALYSIS": {
+        "required": ["kb_film_analysis", "wikipedia"],
+        "optional": ["kb_entity", "kb_plot"],
         "forbidden": [],
     },
     # ── API-first routes (live data required) ────────────────────────────
+    "CRITIC_REVIEW": {
+        "required": ["kb_critic", "cinema_search"],
+        "optional": [],
+        "forbidden": [],
+    },
     "AVAILABILITY": {
-        "required": ["watchmode"],
-        "optional": ["web_search"],
+        "required": ["kb_entity"],
+        "optional": ["watchmode", "cinema_search"],
         "forbidden": [],
     },
     "STREAMING_AVAILABILITY": {
-        "required": ["watchmode"],
-        "optional": ["web_search"],
+        "required": ["kb_entity"],
+        "optional": ["watchmode", "cinema_search"],
         "forbidden": [],
     },
     "DOWNLOAD": {
-        "required": ["watchmode"],
-        "optional": ["web_search"],
-        "forbidden": ["archive"],
+        "required": ["archive"],
+        "optional": ["cinema_search"],
+        "forbidden": ["watchmode"],
     },
     "LEGAL_DOWNLOAD": {
-        "required": ["watchmode"],
-        "optional": ["web_search"],
-        "forbidden": ["archive"],
+        "required": ["archive"],
+        "optional": ["cinema_search"],
+        "forbidden": ["watchmode"],
     },
     "ILLEGAL_DOWNLOAD_REQUEST": {
         "required": [],
@@ -85,28 +95,28 @@ ROUTING_MATRIX: dict[str, dict[str, list[str]]] = {
         "forbidden": ["archive"],
     },
     "TRENDING": {
-        "required": ["web_search", "imdb_trending_tamil"],
+        "required": ["cinema_search",],
         "optional": [],
         "forbidden": [],
     },
     "OFFICIAL": {
-        "required": ["web_search"],
+        "required": ["cinema_search"],
         "optional": ["wikipedia"],
         "forbidden": [],
     },
     "UPCOMING": {
-        "required": ["imdb_upcoming"],
-        "optional": ["web_search"],
+        "required": ["cinema_search"],
+        "optional": [],
         "forbidden": [],
     },
     "AWARD_LOOKUP": {
-        "required": ["wikipedia", "web_search"],
-        "optional": ["imdb"],
+        "required": ["kb_awards", "wikipedia"],
+        "optional": ["imdb_awards", "cinema_search"],
         "forbidden": ["archive"],
     },
     "STREAMING_DISCOVERY": {
-        "required": ["web_search"],
-        "optional": [],
+        "required": ["kb_entity", "cinema_search"],
+        "optional": ["watchmode"],
         "forbidden": [],
     },
     # ── Non-tool intents ─────────────────────────────────────────────────
@@ -116,7 +126,7 @@ ROUTING_MATRIX: dict[str, dict[str, list[str]]] = {
         "forbidden": [],
     },
     "GENERAL_CONVERSATION": {
-        "required": ["web_search"],
+        "required": ["cinema_search"],
         "optional": ["wikipedia"],
         "forbidden": [],
     },
@@ -149,7 +159,7 @@ def build_tool_plan(intent: dict[str, Any], planner_tools: list[dict]) -> dict[s
 
     # Low confidence → add web_search as safety net
     if isinstance(confidence, int) and confidence < 60:
-        required.add("web_search")
+        required.add("cinema_search")
 
     forbidden -= required
     optional -= forbidden

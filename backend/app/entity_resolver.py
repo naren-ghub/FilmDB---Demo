@@ -85,14 +85,34 @@ def _clean_entity_from_message(text: str) -> str:
 
 def _extract_candidate(message: str, intent: dict[str, Any]) -> str:
     entities = intent.get("entities", [])
+    primary = intent.get("primary_intent", "")
+    
+    expected_type = None
+    if primary in ("PERSON_LOOKUP", "FILMOGRAPHY"): expected_type = "person"
+    elif primary in ("AWARD_LOOKUP",): expected_type = "award_event"
+    elif primary in ("ENTITY_LOOKUP", "PLOT_EXPLANATION", "CRITIC_SUMMARY", "MOVIE_SIMILARITY", "COMPARISON", "REVIEWS", "ANALYTICAL_EXPLANATION", "RECOMMENDATION", "DOWNLOAD", "LEGAL_DOWNLOAD", "STREAMING_AVAILABILITY"):
+        expected_type = "movie"
+
+    valid_core_types = {"movie", "person", "award_event"}
+    
     if entities:
-        first = entities[0]
-        if isinstance(first, dict):
-            value = first.get("value")
-            if isinstance(value, str) and value.strip():
-                return value.strip()
-        if isinstance(first, str) and first.strip():
-            return first.strip()
+        # First pass: try to match expected type
+        for ent in entities:
+            if isinstance(ent, dict):
+                etype = ent.get("type", "").lower()
+                val = ent.get("value")
+                if expected_type and etype == expected_type and isinstance(val, str) and val.strip():
+                    return val.strip()
+                    
+        # Second pass: fallback to any valid core type
+        for ent in entities:
+            if isinstance(ent, dict) and ent.get("type", "").lower() in valid_core_types:
+                val = ent.get("value")
+                if isinstance(val, str) and val.strip():
+                    return val.strip()
+            elif isinstance(ent, str) and ent.strip():
+                return ent.strip()
+
     # Fallback: try to extract entity name from the raw message
     return _clean_entity_from_message(message)
 
@@ -115,6 +135,10 @@ def _infer_entity_type(message: str, intent: dict[str, Any]) -> str | None:
     if lowered.startswith("who is") or "biography" in lowered:
         return "person"
     if "movie" in lowered or "film" in lowered or "plot" in lowered or "rating" in lowered:
+        return "movie"
+    # Special case: Known name-like movie titles
+    name_like_movies = {"marty supreme", "mary poppins", "the godfather", "john wick"}
+    if _normalize(message) in name_like_movies:
         return "movie"
     return None
 

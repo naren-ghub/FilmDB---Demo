@@ -2,9 +2,8 @@
 FilmDB – Chat Interface & Sidebar
 ===================================
 Production-grade ChatGPT-like chat with:
-• Deterministic response_mode rendering (FULL_CARD, RECOMMENDATION_GRID, etc.)
-• Animated message bubbles with markdown support
-• Enhanced Quick Actions with contextual inputs
+• Deterministic response_mode rendering (FULL_CARD, RECOMMENDATION_GRID,    A sleek chat UI component handling user input, message styling,
+    and server state updates.
 • Sidebar with searchable chat history, feature shortcuts, and profile section
 • Kebab menu for chat management (rename, clear, delete)
 • Starter prompt cards for empty sessions
@@ -65,17 +64,6 @@ def render_sidebar() -> None:
 
         # ── chat history (always visible) ──
         _render_chat_history()
-
-        st.markdown("---")
-
-        # ── quick actions ──
-        st.markdown(
-            "<p style='font-size:0.72rem;text-transform:uppercase;"
-            "letter-spacing:0.08em;color:#6c6c80;font-weight:600;"
-            "margin-bottom:0.3rem;'>Quick Actions</p>",
-            unsafe_allow_html=True,
-        )
-        _render_quick_actions()
 
         st.markdown("---")
 
@@ -206,163 +194,6 @@ def _render_chat_history() -> None:
                     if st.button("Cancel", key=f"rename_cancel_{sid}", use_container_width=True):
                         st.session_state.pop(f"renaming_{sid}", None)
                         st.rerun()
-
-
-# ═══════════════════════════════════════════════════════════════
-#  ENHANCED QUICK ACTIONS
-# ═══════════════════════════════════════════════════════════════
-
-def _render_quick_actions() -> None:
-    """
-    Smart quick actions that collect user input where needed
-    and construct context-rich messages for the backend.
-    """
-    region = _get_region()
-    platforms = _get_platforms()
-    genres = _get_genres()
-
-    # ────────────────── 1. Streaming Availability ──────────────────
-    with st.expander("📺  Streaming Availability", expanded=False):
-        st.caption("Check where a movie is available to stream")
-        qa_movie = st.text_input(
-            "Movie name",
-            placeholder="e.g. Inception",
-            key="qa_streaming_movie",
-        )
-        if st.button("Search", key="qa_streaming_go", use_container_width=True):
-            if qa_movie.strip():
-                msg = (
-                    f"Where can I stream \"{qa_movie.strip()}\" "
-                    f"in {region}?"
-                )
-                if platforms:
-                    msg += f" I subscribe to {', '.join(platforms)}."
-                _inject_user_message(msg)
-            else:
-                st.warning("Please enter a movie name.")
-
-    # ────────────────── 2. Find Similar Films ──────────────────
-    with st.expander("🎥  Find Similar Films", expanded=False):
-        st.caption("Get recommendations based on a movie you love")
-        qa_sim_movie = st.text_input(
-            "Movie name",
-            placeholder="e.g. Interstellar",
-            key="qa_similar_movie",
-        )
-        qa_sim_genre = st.selectbox(
-            "Preferred genre (optional)",
-            ["Any"] + (genres if genres else [
-                "Action", "Sci-Fi", "Drama", "Thriller", "Romance",
-                "Comedy", "Horror", "Fantasy",
-            ]),
-            key="qa_similar_genre",
-        )
-        if st.button("Find Similar", key="qa_similar_go", use_container_width=True):
-            if qa_sim_movie.strip():
-                msg = f"Recommend movies similar to \"{qa_sim_movie.strip()}\""
-                if qa_sim_genre != "Any":
-                    msg += f" in the {qa_sim_genre} genre"
-                msg += f". I'm based in {region}."
-                _inject_user_message(msg)
-            else:
-                st.warning("Please enter a movie name.")
-
-    # ────────────────── 3. Trending Now ──────────────────
-    with st.expander("🔥  Trending Now", expanded=False):
-        st.caption("See what's trending in your region")
-        if st.button(
-            f"🔥  Show trending movies in {region}",
-            key="qa_trending_go",
-            use_container_width=True,
-        ):
-            msg = f"What are the current trending movies in {region} in 2026?"
-            _inject_user_message(msg)
-
-    # ────────────────── 4. IMDb Top 250 ──────────────────
-    with st.expander("🏆  IMDb Top 250", expanded=False):
-        st.caption("Browse the IMDb top-rated movies of all time")
-        if st.button(
-            "🏆  Show IMDb Top 250",
-            key="qa_top250_go",
-            use_container_width=True,
-        ):
-            _inject_user_message("Show me the IMDb top 250 rated movies of all time")
-
-    # ────────────────── 5. Upcoming Releases ──────────────────
-    with st.expander("🎬  Upcoming Releases", expanded=False):
-        st.caption(f"Movies releasing soon in {region}")
-        if st.button(
-            f"🎬  Upcoming releases in {region}",
-            key="qa_upcoming_go",
-            use_container_width=True,
-        ):
-            msg = f"What are the upcoming movie releases in {region}?"
-            _inject_user_message(msg)
-
-    # ────────────────── 6. Actor / Director Lookup ──────────────────
-    with st.expander("🎭  Actor / Director Lookup", expanded=False):
-        st.caption("Look up filmography & career details")
-        qa_person_type = st.radio(
-            "Looking for",
-            ["Actor / Actress", "Director"],
-            key="qa_person_type",
-            horizontal=True,
-        )
-        qa_person_name = st.text_input(
-            "Name",
-            placeholder="e.g. Christopher Nolan",
-            key="qa_person_name",
-        )
-        if st.button("Lookup", key="qa_person_go", use_container_width=True):
-            if qa_person_name.strip():
-                role = "actor" if qa_person_type == "Actor / Actress" else "director"
-                msg = (
-                    f"Tell me about the {role} {qa_person_name.strip()}. "
-                    f"Include their filmography, achievements, and top films."
-                )
-                _inject_user_message(msg)
-            else:
-                st.warning("Please enter a name.")
-
-    # ────────────────── 7. Movie Deep Dive ──────────────────
-    with st.expander("🎞️  Movie Deep Dive", expanded=False):
-        st.caption("Full details: cast, rating, plot, streaming & more")
-        qa_deepdive = st.text_input(
-            "Movie name",
-            placeholder="e.g. The Dark Knight",
-            key="qa_deepdive_movie",
-        )
-        if st.button("Deep Dive", key="qa_deepdive_go", use_container_width=True):
-            if qa_deepdive.strip():
-                msg = (
-                    f"Give me a complete overview of \"{qa_deepdive.strip()}\": "
-                    f"plot, cast, director, IMDb rating, streaming availability in {region}, "
-                    f"and similar movie recommendations."
-                )
-                _inject_user_message(msg)
-            else:
-                st.warning("Please enter a movie name.")
-
-    # ────────────────── 8. Platform Discovery ──────────────────
-    platform_label = ", ".join(platforms[:3]) if platforms else "your platforms"
-    with st.expander(f"📡  What's New on {platform_label}", expanded=False):
-        if platforms:
-            st.caption(f"Discover trending content on {', '.join(platforms)}")
-        else:
-            st.caption("Set up your platforms in your profile to personalise this")
-        if st.button(
-            f"📡  Show me what's new",
-            key="qa_platform_go",
-            use_container_width=True,
-        ):
-            if platforms:
-                msg = (
-                    f"What are the latest and most popular movies currently available on "
-                    f"{', '.join(platforms)} in {region}?"
-                )
-            else:
-                msg = f"What are the latest and most popular movies streaming in {region}?"
-            _inject_user_message(msg)
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -537,7 +368,7 @@ def _render_starter_cards() -> None:
         "<span style='font-size:2.2rem;'>🎬</span>"
         "<p style='color:#a0a0b8;font-size:0.95rem;margin-top:0.5rem;line-height:1.7;'>"
         "Ask me anything about movies, actors, or streaming.<br>"
-        "Try the <b style='color:#c9a227;'>Quick Actions</b> in the sidebar, or type a question below."
+        "Type a question below to get started."
         "</p></div>",
         unsafe_allow_html=True,
     )
@@ -592,22 +423,21 @@ def _render_assistant_response(msg: dict) -> None:
         if not hide_footer:
             footer_line = f'<div style="margin-top:15px; padding-top:10px; border-top: 1px solid #333; clear: both;"><b style="color:#c9a227;">Where to Watch:</b> {platforms_str}</div>'
         
-        # We use a float-based layout so text wraps around the poster.
-        html = textwrap.dedent(f"""
-            <div style="padding:18px; border-radius:12px; background-color:#111; border:1px solid #333; margin-bottom:20px; overflow: auto;">
-                <div style="float: left; margin: 0 20px 10px 0;">
-                    <img src="{poster}" style="width:200px; border-radius:8px; display: block;">
-                </div>
-                <div style="color: white;">
-                    <h2 style="margin-bottom:5px; margin-top:0;">{title}</h2>
-                    <p style="color:#bbb;margin-top:0;">{director} • {year} • ⭐ {rating}</p>
-                    <div style="line-height:1.6; font-size: 0.95rem;">
-                        {md_to_html(text)}
-                    </div>
-                    {footer_line}
-                </div>
-            </div>
-        """).strip()
+        html = f"""
+<div style="padding:18px; border-radius:12px; background-color:#111; border:1px solid #333; margin-bottom:20px; overflow: auto;">
+    <div style="float: left; margin: 0 20px 10px 0;">
+        <img src="{poster}" style="width:200px; border-radius:8px; display: block;">
+    </div>
+    <div style="color: white;">
+        <h2 style="margin-bottom:5px; margin-top:0;">{title}</h2>
+        <p style="color:#bbb;margin-top:0;">{director} • {year} • ⭐ {rating}</p>
+        <div style="line-height:1.6; font-size: 0.95rem;">
+            {md_to_html(text)}
+        </div>
+        {footer_line}
+    </div>
+</div>
+""".strip()
         st.markdown(html, unsafe_allow_html=True)
     else:
         # ── text bubble for all other modes ──

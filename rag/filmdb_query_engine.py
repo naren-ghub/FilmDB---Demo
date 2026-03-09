@@ -44,6 +44,8 @@ class FilmDBQueryEngine:
         self._recommendations = self._load("recommendation_layer.parquet")
         self._regional = self._load("regional_layer.parquet")
         self._persons = self._load("person_index.parquet")
+        self._streaming = self._load("streaming_layer.parquet")
+        self._oscars = self._load("oscar_layer.parquet")
 
         # ── Load analysis layer (JSONL, not Parquet) ───────────────────────
         self._analysis: list[dict] = []
@@ -66,14 +68,42 @@ class FilmDBQueryEngine:
         self._title_index: dict[str, str] = {}
 
         if self._movie_entity is not None:
-            me = self._movie_entity[["imdb_id", "title", "year"]].dropna(subset=["title"])
+            # 1. Prepare dataframe for indexing
+            cols_to_use = ["imdb_id", "title", "year"]
+            if "imdb_votes" in self._movie_entity.columns: cols_to_use.append("imdb_votes")
+            if "is_top_movie" in self._movie_entity.columns: cols_to_use.append("is_top_movie")
+            if "type" in self._movie_entity.columns: cols_to_use.append("type")
+            
+            me = self._movie_entity[cols_to_use].dropna(subset=["title"]).copy()
+            
+            # Sort to prioritize: Top Movies > TV Shows > High Votes > Normal Movies
+            sort_cols = []
+            sort_asc = []
+            if "is_top_movie" in me.columns:
+                sort_cols.append("is_top_movie")
+                sort_asc.append(False)
+            if "type" in me.columns:
+                # Prioritize 'tv_show' (our injected data) over random short films with same name
+                me["_is_tv"] = me["type"] == "tv_show"
+                sort_cols.append("_is_tv")
+                sort_asc.append(False)
+            if "imdb_votes" in me.columns:
+                me["_votes_f"] = pd.to_numeric(me["imdb_votes"], errors="coerce").fillna(0)
+                sort_cols.append("_votes_f")
+                sort_asc.append(False)
+                
+            if sort_cols:
+                me = me.sort_values(sort_cols, ascending=sort_asc)
+
             titles_lower = me["title"].astype(str).str.lower().str.strip()
             years_str = me["year"].astype(str).where(me["year"].notna(), "").str.strip()
             keys = titles_lower + "|" + years_str
+            
             # Build title+year index (first occurrence wins)
             ty_df = pd.DataFrame({"key": keys, "imdb_id": me["imdb_id"].values})
             ty_df = ty_df.drop_duplicates(subset="key", keep="first")
             self._title_year_index = dict(zip(ty_df["key"], ty_df["imdb_id"]))
+            
             # Build title-only index (first occurrence wins)
             t_df = pd.DataFrame({"title": titles_lower.values, "imdb_id": me["imdb_id"].values})
             t_df = t_df.drop_duplicates(subset="title", keep="first")
@@ -179,6 +209,9 @@ class FilmDBQueryEngine:
                 movie["revenue"] = meta.get("revenue")
                 movie["keywords"] = meta.get("keywords")
                 movie["original_language"] = meta.get("original_language")
+                movie["historical_box_office_rank"] = meta.get("historical_box_office_rank")
+                movie["historical_worldwide_gross"] = meta.get("historical_worldwide_gross")
+                movie["studio"] = meta.get("studio")
 
         # Enrich with regional data
         if self._regional is not None:
@@ -191,7 +224,81 @@ class FilmDBQueryEngine:
         # Clean NaN values
         return {k: (None if pd.isna(v) else v) for k, v in movie.items()}
 
+    # ─── Streaming Availability ──────────────────────────────────────────────
+
+    def is_streaming(self, imdb_id: str) -> dict[str, Any] | None:
+        """Retrieve streaming platform availability and age ratings."""
+        if self._streaming is None:
+            return None
+            
+        row = self._streaming[self._streaming["imdb_id"] == imdb_id]
+        if row.empty:
+            return None
+            
+        data = row.iloc[0].to_dict()
+        platforms = []
+        if data.get("Netflix") == 1: platforms.append("Netflix")
+        if data.get("Hulu") == 1: platforms.append("Hulu")
+        if data.get("Prime_Video") == 1: platforms.append("Prime Video")
+        if data.get("Disney_Plus") == 1: platforms.append("Disney+")
+        
+        return {
+            "imdb_id": imdb_id,
+            "title": data.get("clean_title", "").title(),
+            "year": data.get("clean_year"),
+            "is_tv_show": bool(data.get("is_tv_show", 0)),
+            "age_rating": data.get("Age"),
+            "platforms": platforms
+        }
+
+    # ─── Oscars & Awards ─────────────────────────────────────────────────────
+
+    def get_movie_oscars(self, imdb_id: str) -> list[dict[str, Any]] | None:
+        """Find all Oscar nominations and wins for a specific movie."""
+        if self._oscars is None:
+            return None
+            
+        matches = self._oscars[self._oscars["imdb_id"] == imdb_id]
+        if matches.empty:
+            return []
+            
+        # Format list to return
+        results = []
+        for _, r in matches.iterrows():
+            results.append({
+                "year": r.get("year_ceremony"),
+                "category": r.get("canon_category"),
+                "nominee_name": r.get("nominee_name"),
+                "won": bool(r.get("winner", False))
+            })
+            
+        # Sort by won=True first, then year descending
+        results.sort(key=lambda x: (not x["won"], -x["year"]))
+        return results
+
+    def get_person_oscars(self, nconst: str) -> list[dict[str, Any]] | None:
+        """Find all Oscar nominations and wins for a specific person."""
+        if self._oscars is None:
+            return None
+            
+        matches = self._oscars[self._oscars["nconst"] == nconst]
+        if matches.empty:
+            return []
+            
+        results = []
+        for _, r in matches.iterrows():
+            results.append({
+                "year": r.get("year_ceremony"),
+                "category": r.get("canon_category"),
+                "film": r.get("film_title"),
+                "won": bool(r.get("winner", False))
+            })
+            
+        results.sort(key=lambda x: (not x["won"], -x["year"]))
+        return results
+
     # ─── Plot Analysis ───────────────────────────────────────────────────────
+
 
     def plot_analysis(self, imdb_id: str) -> dict[str, Any] | None:
         """Retrieve Wikipedia plot text for a movie."""
@@ -241,45 +348,80 @@ class FilmDBQueryEngine:
 
     # ─── Movie Similarity ────────────────────────────────────────────────────
 
-    def movie_similarity(self, imdb_id: str, top_n: int = 10) -> dict[str, Any] | None:
-        """Find similar movies based on shared MovieLens tags."""
-        if self._recommendations is None:
+    def movie_similarity(self, imdb_id: str, top_n: int = 15) -> dict[str, Any] | None:
+        """Find similar movies based on weighted tags and genre matching."""
+        if self._recommendations is None or self._movie_entity is None:
             return None
 
+        # 1. Get Target Data
         target_row = self._recommendations[self._recommendations["imdb_id"] == imdb_id]
-        if target_row.empty:
-            return None
+        if target_row.empty: return None
+        
+        target_entity = self._movie_entity[self._movie_entity["imdb_id"] == imdb_id]
+        if target_entity.empty: return None
 
-        target_tags_str = target_row.iloc[0].get("ml_tags")
-        if not isinstance(target_tags_str, str) or not target_tags_str:
-            return None
-
+        target_tags_str = target_row.iloc[0].get("ml_tags", "")
         target_tags = set(target_tags_str.lower().split("|"))
-        if not target_tags:
-            return None
+        target_genres = set((target_entity.iloc[0].get("genres") or "").split(","))
 
-        # Score all other movies by tag overlap
+        # 2. Define Generic Tags to deprioritize
+        GENERIC_TAGS = {"classic", "masterpiece", "epic", "oscar (best picture)", "great acting", "highly quotable", "visually appealing"}
+
+        # 3. Create Genre Map for fast lookup during scoring
+        # Optimization: Pre-filter recommendation set by genre overlap if possible, 
+        # but here we'll just score the full set since it's already a filtered 'recommendation' table.
+        
         scores = []
-        for _, row in self._recommendations.iterrows():
+        # Join genres to recommendation rows for ranking
+        merged = self._recommendations.merge(self._movie_entity[["imdb_id", "genres"]], on="imdb_id", how="left")
+
+        for _, row in merged.iterrows():
             other_id = row["imdb_id"]
             if other_id == imdb_id:
                 continue
+            
+            # A. Tag Scoring
             other_tags_str = row.get("ml_tags")
-            if not isinstance(other_tags_str, str):
-                continue
+            if not isinstance(other_tags_str, str): 
+                other_tags_str = ""
             other_tags = set(other_tags_str.lower().split("|"))
+            
             overlap = target_tags & other_tags
-            if len(overlap) >= 2:
+            if not overlap: continue
+
+            # Weighted sum: 5 for specific tags, 1 for generic
+            tag_score = sum(5 if t not in GENERIC_TAGS else 1 for t in overlap)
+
+            # B. Genre Scoring (Massive boost for genre alignment)
+            raw_genres = row.get("genres")
+            if not isinstance(raw_genres, str):
+                raw_genres = ""
+            other_genres = set(raw_genres.split(","))
+            genre_overlap = target_genres & other_genres
+            genre_boost = len(genre_overlap) * 12
+
+            # C. MovieLens Rating Factor
+            try:
+                rating_factor = float(row.get("ml_avg_rating") or 0) * 2
+            except (ValueError, TypeError):
+                rating_factor = 0
+
+
+            total_score = tag_score + genre_boost + rating_factor
+
+            # Require at least some unique tag overlap or significant genre match
+            if total_score > 15:
                 scores.append({
                     "imdb_id": other_id,
                     "shared_tags": sorted(overlap),
-                    "overlap_count": len(overlap),
-                    "ml_avg_rating": row.get("ml_avg_rating"),
+                    "total_score": total_score,
+                    "genre_alignment": list(genre_overlap)
                 })
 
-        # Sort by overlap count (desc), then by rating (desc)
-        scores.sort(key=lambda x: (-x["overlap_count"], -(x["ml_avg_rating"] or 0)))
+        # Sort by total score
+        scores.sort(key=lambda x: -x["total_score"])
         top_matches = scores[:top_n]
+
 
         # Enrich with titles from movie_entity and posters from metadata
         if self._movie_entity is not None:
@@ -321,6 +463,14 @@ class FilmDBQueryEngine:
 
         # Must have a rating
         df = df[df["imdb_rating"].notna()]
+        
+        # Prioritize the mapped Kaggle dataset if available
+        if "is_top_movie" in df.columns:
+            df = df[df["is_top_movie"] == True]
+        else:
+            # Fallback heuristic: need at least some votes to prevent obscure shorts
+            df["_votes_test"] = pd.to_numeric(df["imdb_votes"], errors="coerce").fillna(0)
+            df = df[df["_votes_test"] > 1000]
 
         # Apply filters
         if genre:
@@ -536,6 +686,7 @@ class FilmDBQueryEngine:
                     "matched_entities": [
                         p for p in all_people if name_lower in p.lower()
                     ],
+                    "chunks": article.get("chunks", []),
                     "text_preview": (article.get("text", "")[:300] + "…")
                                     if article.get("text") else None,
                 })

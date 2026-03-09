@@ -28,36 +28,19 @@ TOOL_REGISTRY = {
         "description": "Legal public domain download",
         "required": ["title"],
     },
-    "web_search": {
-        "name": "web_search",
-        "description": "Latest news, reviews, sentiment, box office, and broad search queries, recent events, recently, newly, upcoming",
+
+
+    "imdb_awards": {
+        "name": "imdb_awards",
+        "description": "IMDb awards and nominations for a movie",
+        "required": [],
+    },
+    "cinema_search": {
+        "name": "cinema_search",
+        "description": "Domain-restricted web search for cinema news, reviews, awards, and trends",
         "required": ["query"],
     },
-    "imdb_trending_tamil": {
-        "name": "imdb_trending_tamil",
-        "description": "IMDb trending Tamil movies list",
-        "required": [],
-    },
-    "imdb_top_rated_english": {
-        "name": "imdb_top_rated_english",
-        "description": "IMDb top rated English movies list",
-        "required": [],
-    },
-    "imdb_upcoming": {
-        "name": "imdb_upcoming",
-        "description": "IMDb upcoming releases by country",
-        "required": [],
-    },
-    "imdb_person": {
-        "name": "imdb_person",
-        "description": "IMDb personality profile and filmography",
-        "required": ["name"],
-    },
-    "rt_reviews": {
-        "name": "rt_reviews",
-        "description": "Rotten Tomatoes critics sentiment (score only)",
-        "required": ["title"],
-    },
+
     # ── KB-powered tools ─────────────────────────────────────────────────
     "kb_entity": {
         "name": "kb_entity",
@@ -93,6 +76,16 @@ TOOL_REGISTRY = {
         "name": "kb_comparison",
         "description": "KB side-by-side movie comparison",
         "required": ["title_a", "title_b"],
+    },
+    "kb_film_analysis": {
+        "name": "kb_film_analysis",
+        "description": "KB film analysis articles from scraped editorial sources (BFI, Senses of Cinema)",
+        "required": [],
+    },
+    "kb_awards": {
+        "name": "kb_awards",
+        "description": "KB local Oscar nominations and wins for a movie or person",
+        "required": [],
     },
 }
 

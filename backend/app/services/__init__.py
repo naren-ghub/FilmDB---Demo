@@ -1,12 +1,6 @@
-from app.services import (
-    archive_service,
-    discovery_engine_service,
-    imdb_service,
-    imdb_person_service,
-    rt_reviews_service,
-    similarity_service,
-    tmdb_service,
-    watchmode_service,
-    web_search_service,
-    wikipedia_service,
-)
+from . import archive_service
+from . import cinema_search_service
+from . import imdb_awards_service
+from . import watchmode_service
+from . import wikipedia_service
+from . import tmdb_service

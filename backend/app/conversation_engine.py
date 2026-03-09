@@ -11,10 +11,8 @@ from app.config import settings
 from app.db.models import SessionLocal
 from app.db.cache_layer import (
     get_metadata_cache,
-    get_similarity_cache,
     get_streaming_cache,
     set_metadata_cache,
-    set_similarity_cache,
     set_streaming_cache,
 )
 from app.db.session_store import (
@@ -36,7 +34,7 @@ from app.routing_matrix import build_tool_plan
 from app.utils.prompt_builder import build_prompt
 from app.utils.tool_formatter import summarize_all
 from app import services
-from app.services.kb import (
+from app.services.kb_service import (
     kb_entity_lookup,
     kb_plot_analysis,
     kb_critic_summary,
@@ -44,6 +42,8 @@ from app.services.kb import (
     kb_top_rated,
     kb_person_filmography,
     kb_movie_comparison,
+    kb_film_analysis,
+    kb_awards,
 )
 
 
@@ -64,8 +64,16 @@ Rules:
 - TOOL DATA is provided in [TOOL_DATA] ... [/TOOL_DATA] blocks.
 - If live data is provided, integrate it naturally into your response.
 - If no tool data is available, use your knowledge but mention that live data could provide more accurate details.
+- DISAMBIGUATION: If TOOL DATA contains "status": "disambiguation" and a list of candidates, you MUST NOT pick one. Instead, inform the user that multiple movies match their query and list the available versions (Title, Year, Brief overview) and ask them to clarify which one they meant.
 - Structure responses using headings and bullet points when appropriate, but skip generic introductory headers.
 - For greetings, respond warmly and suggest what you can help with (movie info, streaming, recommendations, etc.)
+- NEVER mention "TOOL DATA", "[TOOL_DATA]", "tool data", "the provided data", or "the data provides" in your response. Present information naturally as if you know it.
+- Do NOT list raw metadata fields like "Title:", "Year:", "Rating:" as bullet points. Weave data into flowing prose or well-structured sections.
+- If cinema_search data is present in TOOL DATA, you MUST use those article summaries to answer the question. Do NOT say "I don't have access to real-time information" when TOOL DATA contains relevant content.
+- If cinema_search provides ranked snippets, synthesize them directly into your final answer. Do not ask to search again or read more. You must complete your answer in this single turn.
+- NEVER tell the user to "check Variety.com yourself" or "visit the official website" when TOOL DATA already contains content from those sources. Present the information directly.
+- If TOOL DATA shows status=error or is empty AND the question is about current/recent events, say "Based on my available knowledge:" and provide what you can.
+- CRITICAL: Never hallucinate "recommendations". If `kb_similarity` or `similarity` tool data is NOT provided, you MUST leave the recommendations array empty. Do not make up similar movies.
 """
 
 
@@ -75,8 +83,10 @@ TOOL_PROPOSAL_USER = ""
 
 class ConversationEngine:
     def __init__(self) -> None:
+        from app.llm.gemini_client import GeminiClient
         self.llm = GroqClient()
-        self.intent_agent = IntentAgent(self.llm)
+        self.gemini = GeminiClient()
+        self.intent_agent = IntentAgent(self.llm, self.gemini)
         self.entity_resolver = EntityResolver()
         self.logger = logging.getLogger(__name__)
 
@@ -203,8 +213,17 @@ class ConversationEngine:
             trace["tool_execution"] = tool_trace
 
             tool_summaries = summarize_all(tool_outputs)
+            # ── Dynamic Instruction Injection ──
+            # If the user explicitly asks for availability, we want the LLM to provide a subtopic.
+            # Otherwise, we hide it from the text because it's in the UI footer.
+            dynamic_instr = SYSTEM_INSTRUCTIONS
+            if intent.get("primary_intent") == "STREAMING_AVAILABILITY":
+                dynamic_instr += "\n- The user is asking for streaming availability. You MUST provide a dedicated 'Streaming Availability' subtopic with the platforms from the tool data."
+            else:
+                dynamic_instr += "\n- IMPORTANT: Do NOT list streaming platforms or 'Where to Watch' info in your text response. This info is already displayed in a dedicated UI card footer. Focus on other aspects."
+
             prompt = build_prompt(
-                system_instructions=SYSTEM_INSTRUCTIONS,
+                system_instructions=dynamic_instr,
                 user_profile=self._profile_to_dict(profile) if profile else None,
                 recent_messages=[],
                 tool_summaries=tool_summaries,
@@ -212,7 +231,7 @@ class ConversationEngine:
             )
 
             final_text = self.llm.generate_response(prompt)
-            if self._needs_grounding_retry(tool_outputs, final_text):
+            if self._needs_grounding_retry(tool_outputs, final_text, intent):
                 strict_prompt = build_prompt(
                     system_instructions=SYSTEM_INSTRUCTIONS
                     + "\nSTRICT GROUNDING: You MUST use TOOL DATA values verbatim.",
@@ -266,6 +285,13 @@ class ConversationEngine:
             )
             self._write_llm_report(trace, response)
             return response, trace
+        except Exception as e:
+            self.logger.exception("Fatal error in _run_internal")
+            import traceback
+            trace["fatal_error"] = f"{type(e).__name__}: {str(e)}"
+            trace["fatal_error_tb"] = traceback.format_exc()
+            self._write_llm_report(trace, {"response_mode": "FATAL_ERROR", "text_response": "Internal Server Error."})
+            raise
         finally:
             db.close()
 
@@ -291,6 +317,7 @@ class ConversationEngine:
 
         # Extract second entity for comparison
         title_b = None
+        person_name_b = None
         primary = intent.get("primary_intent", "")
         if primary == "COMPARISON":
             entities = intent.get("entities", [])
@@ -298,6 +325,11 @@ class ConversationEngine:
             if len(movie_entities) >= 2:
                 title = movie_entities[0].get("value", title)
                 title_b = movie_entities[1].get("value", "")
+            
+            person_entities = [e for e in entities if isinstance(e, dict) and e.get("type") == "person"]
+            if len(person_entities) >= 2:
+                person_name = person_entities[0].get("value", person_name)
+                person_name_b = person_entities[1].get("value", "")
 
         # Extract genre/year/language for top_rated
         genre_filter = None
@@ -327,22 +359,18 @@ class ConversationEngine:
         for name in tool_names:
             args: dict[str, Any] = {}
             # ── API tools ────────────────────────────────────────────────
-            if name in ("imdb", "wikipedia", "similarity", "archive"):
+            if name in ("wikipedia", "archive", "imdb_awards"):
                 args = {"title": title}
+            elif name == "tmdb":
+                args = {"title": title}
+                if resolved_entity.get("year"):
+                    args["year"] = resolved_entity.get("year")
+                if primary in ("PERSON_LOOKUP", "FILMOGRAPHY", "COMPARISON") or resolved_entity.get("entity_type") == "person" or person_name_b:
+                    args = {"name": person_name}
             elif name == "watchmode":
                 args = {"title": title, "region": region or "IN"}
-            elif name == "web_search":
+            elif name == "cinema_search":
                 args = {"query": message}
-            elif name == "imdb_trending_tamil":
-                args = {}
-            elif name == "imdb_top_rated_english":
-                args = {}
-            elif name == "imdb_upcoming":
-                args = {"country": region or "IN"}
-            elif name == "imdb_person":
-                args = {"name": person_name}
-            elif name == "rt_reviews":
-                args = {"title": title}
             # ── KB tools ─────────────────────────────────────────────────
             elif name in ("kb_entity", "kb_plot", "kb_critic", "kb_similarity"):
                 args = {"title": title}
@@ -356,9 +384,35 @@ class ConversationEngine:
                     args["language"] = language_filter
             elif name == "kb_filmography":
                 args = {"name": person_name}
+            elif name == "kb_awards":
+                if person_name and not title:
+                    args = {"person_name": person_name}
+                else:
+                    args = {"movie_title": title}
             elif name == "kb_comparison":
                 args = {"title_a": title, "title_b": title_b or ""}
+            elif name == "kb_film_analysis":
+                args = {"title": title, "person": person_name}
+            
             tool_calls.append({"name": name, "arguments": args})
+
+            # ── Add secondary call for Comparison if entity B exists ──
+            if primary == "COMPARISON":
+                if title_b and name in ("wikipedia", "kb_entity", "kb_plot", "kb_critic", "tmdb"):
+                    args_b = dict(args)
+                    args_b["title"] = title_b
+                    if name == "tmdb": args_b.pop("name", None)
+                    tool_calls.append({"name": f"{name}_b", "arguments": args_b})
+                if person_name_b and name in ("wikipedia", "kb_filmography", "tmdb", "kb_film_analysis"):
+                    args_b = dict(args)
+                    if "name" in args_b: args_b["name"] = person_name_b
+                    if "person" in args_b: args_b["person"] = person_name_b
+                    if name == "wikipedia": args_b["title"] = person_name_b
+                    if name == "tmdb":
+                         args_b["name"] = person_name_b
+                         args_b.pop("title", None)
+                    tool_calls.append({"name": f"{name}_b", "arguments": args_b})
+
         return tool_calls
 
     def _resolve_pronouns(self, message: str, session_ctx) -> str:
@@ -419,7 +473,12 @@ class ConversationEngine:
             return tool_calls
         return [call for call in tool_calls if call.get("name") != "archive"]
 
-    def _needs_grounding_retry(self, tool_outputs: dict[str, dict], final_text: str) -> bool:
+    def _needs_grounding_retry(self, tool_outputs: dict[str, dict], final_text: str, intent: dict[str, Any]) -> bool:
+        primary_intent = intent.get("primary_intent", "")
+        # Only enforce rating/year inclusion for general entity lookups and recommendations
+        if primary_intent not in ("ENTITY_LOOKUP", "RECOMMENDATION", "CRITIC_SUMMARY"):
+            return False
+
         # Check API IMDb data
         imdb = tool_outputs.get("imdb")
         if imdb and imdb.get("status") == "success":
@@ -438,6 +497,15 @@ class ConversationEngine:
                 return True
             if year and str(year) not in final_text:
                 return True
+        # Check Live TMDB data
+        tmdb_out = tool_outputs.get("tmdb")
+        if tmdb_out and tmdb_out.get("status") == "success":
+            rating = tmdb_out.get("data", {}).get("rating")
+            year = tmdb_out.get("data", {}).get("year")
+            if rating and str(rating) not in final_text:
+                return True
+            if year and str(year) not in final_text:
+                return True
         return False
 
     def _extract_movie_from_tools(self, tool_outputs: dict[str, dict]) -> str | None:
@@ -447,6 +515,9 @@ class ConversationEngine:
         kb = tool_outputs.get("kb_entity")
         if kb and kb.get("status") == "success":
             return kb.get("data", {}).get("title")
+        tmdb_out = tool_outputs.get("tmdb")
+        if tmdb_out and tmdb_out.get("status") == "success":
+            return tmdb_out.get("data", {}).get("title")
         return None
 
     def _extract_person_from_intent(self, intent: dict[str, Any]) -> str | None:
@@ -499,7 +570,8 @@ class ConversationEngine:
                         cache_misses.append("wikipedia")
 
                 region = getattr(profile, "region", None) if profile else None
-                if region:
+                approved_tool_names = {c.get("name") for c in tool_calls if isinstance(c, dict)}
+                if region and "watchmode" in approved_tool_names:
                     streaming_cache = get_streaming_cache(db, title, region)
                     if streaming_cache:
                         cached_outputs["watchmode"] = {
@@ -510,48 +582,29 @@ class ConversationEngine:
                     else:
                         cache_misses.append("watchmode")
 
-                similarity_cache = get_similarity_cache(db, title)
-                if similarity_cache:
-                    cached_outputs["similarity"] = {
-                        "status": "success",
-                        "data": similarity_cache.recommendations,
-                    }
-                    cache_hits.append("similarity")
-                else:
-                    cache_misses.append("similarity")
+
         finally:
             db.close()
 
         outputs: Dict[str, Dict] = dict(cached_outputs)
 
-        similarity_call = next((call for call in tool_calls if call.get("name") == "similarity"), None)
-        imdb_call = next((call for call in tool_calls if call.get("name") == "imdb"), None)
         imdb_id = None
-        if outputs.get("imdb"):
-            imdb_id = outputs["imdb"].get("data", {}).get("imdb_id")
-
-        if similarity_call:
-            if not imdb_id and imdb_call and imdb_call.get("name") not in outputs:
-                imdb_args = imdb_call.get("arguments", {})
-                start = time.monotonic()
-                # Use TMDB to get imdb_id for similarity lookup
-                tmdb_result = await services.tmdb_service.run(imdb_args.get("title", ""))
-                elapsed_ms = int((time.monotonic() - start) * 1000)
-                outputs["imdb"] = tmdb_result
-                store_tool_call(
-                    session_id=session_id,
-                    tool_name="imdb",
-                    request_payload=imdb_args,
-                    response_status=tmdb_result.get("status", "error"),
-                    execution_time_ms=elapsed_ms,
-                )
-                imdb_id = tmdb_result.get("data", {}).get("imdb_id")
-
-            if imdb_id:
-                similarity_call.setdefault("arguments", {})["imdb_id"] = imdb_id
-            else:
-                title = similarity_call.get("arguments", {}).get("title", "")
-                outputs["similarity"] = {"status": "not_found", "data": {"title": title}}
+        # ── Pre-process: Resolve IMDb ID for awards ──
+        target_calls = [c for c in tool_calls if c.get("name") == "imdb_awards"]
+        if target_calls:
+            # Try to get imdb_id from KB/Resolver
+            if not imdb_id:
+                from rag.filmdb_query_engine import FilmDBQueryEngine
+                engine = FilmDBQueryEngine.get_instance()
+                imdb_id = engine.resolve_title_to_imdb_id(title)
+            
+            for call in target_calls:
+                if imdb_id:
+                    call.setdefault("arguments", {})["imdb_id"] = imdb_id
+                else:
+                    call_name = call.get("name")
+                    title = call.get("arguments", {}).get("title", "")
+                    outputs[call_name] = {"status": "not_found", "data": {"title": title, "reason": "imdb_id_not_found"}}
 
         for call in tool_calls:
             tool_name = call.get("name")
@@ -564,24 +617,39 @@ class ConversationEngine:
                 tool_names.append((tool_name, args))
                 tasks.append(task)
 
-        start_times = [time.monotonic() for _ in tasks]
+        async def _time_task(task_coro):
+            start = time.monotonic()
+            try:
+                res = await task_coro
+                return res, int((time.monotonic() - start) * 1000)
+            except Exception as e:
+                return e, int((time.monotonic() - start) * 1000)
+
+        timed_tasks = [_time_task(t) for t in tasks]
         try:
-            results = await asyncio.wait_for(
-                asyncio.gather(*tasks, return_exceptions=True),
+            results_with_times = await asyncio.wait_for(
+                asyncio.gather(*timed_tasks),
                 timeout=45.0,
             )
         except asyncio.TimeoutError:
             self.logger.warning("Tool execution timed out after 45s")
-            results = [TimeoutError("Tool execution timed out") for _ in tasks]
+            results_with_times = [(TimeoutError("Tool execution timed out"), 45000) for _ in tasks]
+            
         timings: list[dict[str, Any]] = []
 
-        for idx, ((tool_name, args), result) in enumerate(zip(tool_names, results)):
+        for idx, ((tool_name, args), (result, elapsed_ms)) in enumerate(zip(tool_names, results_with_times)):
             status = "error"
             output = {"status": "error", "data": {}}
-            if isinstance(result, dict):
+            error_detail = None
+            if isinstance(result, Exception):
+                error_detail = f"{type(result).__name__}: {str(result)}"
+                self.logger.exception(f"Tool {tool_name} failed with exception", exc_info=result)
+            elif isinstance(result, dict):
                 output = result
                 status = result.get("status", "error")
-            elapsed_ms = int((time.monotonic() - start_times[idx]) * 1000)
+                if status == "error":
+                    error_detail = result.get("data", {}).get("error") or result.get("error", "Unknown tool error")
+
             outputs[tool_name] = output
             store_tool_call(session_id, tool_name, args, status, elapsed_ms)
             timings.append(
@@ -590,6 +658,7 @@ class ConversationEngine:
                     "status": status,
                     "execution_time_ms": elapsed_ms,
                     "arguments": args,
+                    "error_detail": error_detail,
                 }
             )
 
@@ -605,42 +674,36 @@ class ConversationEngine:
         region = None
         if profile and getattr(profile, "region", None):
             region = profile.region
-        if tool_name == "imdb":
-            # Use TMDB as primary source (RapidAPI IMDb key expired)
-            return services.tmdb_service.run(args.get("title", ""))
-        if tool_name == "wikipedia":
+        
+        # Handle suffix for comparison B calls
+        base_name = tool_name
+        if tool_name.endswith("_b"):
+            base_name = tool_name[:-2]
+
+        if base_name == "wikipedia":
             return services.wikipedia_service.run(args.get("title", ""))
-        if tool_name == "watchmode":
+        if base_name == "tmdb":
+            if "name" in args:
+                return services.tmdb_service.get_person(args.get("name", ""))
+            return services.tmdb_service.run(args.get("title", ""))
+        if base_name == "watchmode":
             return services.watchmode_service.run(args.get("title", ""), args.get("region") or region)
-        if tool_name == "similarity":
-            return services.similarity_service.run(
-                args.get("title", ""), imdb_id=args.get("imdb_id")
-            )
-        if tool_name == "archive":
+        if base_name == "imdb_awards":
+            return services.imdb_awards_service.run(imdb_id=args.get("imdb_id", ""))
+        if base_name == "archive":
             return services.archive_service.run(args.get("title", ""))
-        if tool_name == "web_search":
-            return services.web_search_service.run(args.get("query", ""))
-        if tool_name == "imdb_trending_tamil":
-            return services.discovery_engine_service.run_trending_tamil()
-        if tool_name == "imdb_top_rated_english":
-            return services.discovery_engine_service.run_top_rated_english()
-        if tool_name == "imdb_upcoming":
-            return services.discovery_engine_service.run_upcoming(args.get("country") or region)
-        if tool_name == "imdb_person":
-            # Use TMDB person lookup (RapidAPI IMDb key expired)
-            return services.tmdb_service.get_person(
-                name=args.get("name", "")
-            )
-        if tool_name == "rt_reviews":
-            return services.rt_reviews_service.run(args.get("title", ""))
+        if base_name == "cinema_search":
+            return services.cinema_search_service.run(args.get("query", ""))
         # ── KB tools ─────────────────────────────────────────────────────
-        if tool_name == "kb_entity":
+        if base_name == "kb_awards":
+            return kb_awards.run(movie_title=args.get("movie_title"), person_name=args.get("person_name"))
+        if base_name == "kb_entity":
             return kb_entity_lookup.run(args.get("title", ""))
-        if tool_name == "kb_plot":
+        if base_name == "kb_plot":
             return kb_plot_analysis.run(args.get("title", ""))
-        if tool_name == "kb_critic":
+        if base_name == "kb_critic":
             return kb_critic_summary.run(args.get("title", ""))
-        if tool_name == "kb_similarity":
+        if base_name == "kb_similarity":
             return kb_movie_similarity.run(args.get("title", ""))
         if tool_name == "kb_top_rated":
             return kb_top_rated.run(
@@ -654,6 +717,10 @@ class ConversationEngine:
             return kb_movie_comparison.run(
                 args.get("title_a", ""), args.get("title_b", "")
             )
+        if tool_name == "kb_film_analysis":
+            return kb_film_analysis.run(
+                title=args.get("title", ""), person=args.get("person", "")
+            )
         return None
 
     def _build_response(self, text: str, tool_outputs: Dict[str, Dict]) -> Dict[str, Any]:
@@ -664,17 +731,54 @@ class ConversationEngine:
             "recommendations": [],
             "download_link": "",
             "sources": [],
+            "title": "",
+            "year": "",
+            "director": "",
+            "rating": "",
         }
-        # Poster from IMDb/TMDB API
+        # Data from IMDb/TMDB API
         imdb = tool_outputs.get("imdb")
         if imdb and imdb.get("status") == "success":
-            response["poster_url"] = imdb.get("data", {}).get("poster_url", "")
-        # Poster from KB entity (TMDB poster_path)
+            data = imdb.get("data", {})
+            response["poster_url"] = data.get("poster_url", "")
+            response["title"] = data.get("title", "")
+            response["year"] = data.get("year", "")
+            response["director"] = data.get("director", "")
+            response["rating"] = data.get("rating", "")
+        # Data from TMDB Service
+        tmdb_out = tool_outputs.get("tmdb")
+        if tmdb_out and tmdb_out.get("status") == "success":
+            data = tmdb_out.get("data", {})
+            if "name" in data: # Person Data
+                if not response["poster_url"]:
+                    response["poster_url"] = data.get("poster_url", "")
+            else: # Movie Data
+                if not response["poster_url"]:
+                    response["poster_url"] = data.get("poster_url", "")
+                if not response["title"]:
+                    response["title"] = data.get("title", "")
+                if not response["year"]:
+                    response["year"] = data.get("year", "")
+                if not response["rating"]:
+                    response["rating"] = data.get("rating", "")
+                if not response["director"]:
+                    response["director"] = data.get("director", "")
+        # Data from KB entity
         kb_entity = tool_outputs.get("kb_entity")
-        if kb_entity and kb_entity.get("status") == "success" and not response["poster_url"]:
-            poster_path = kb_entity.get("data", {}).get("poster_path", "")
-            if poster_path:
-                response["poster_url"] = f"https://image.tmdb.org/t/p/w500{poster_path}"
+        if kb_entity and kb_entity.get("status") == "success":
+            data = kb_entity.get("data", {})
+            if not response["poster_url"]:
+                poster_path = data.get("poster_path", "")
+                if poster_path:
+                    response["poster_url"] = f"https://image.tmdb.org/t/p/w500{poster_path}"
+            if not response["title"]:
+                response["title"] = data.get("title", "")
+            if not response["year"]:
+                response["year"] = data.get("year", "")
+            if not response["rating"]:
+                response["rating"] = data.get("imdb_rating", "")
+            if not response["director"]:
+                response["director"] = data.get("director", "")
         imdb_person = tool_outputs.get("imdb_person")
         if imdb_person and imdb_person.get("status") == "success":
             response["poster_url"] = (
@@ -693,25 +797,26 @@ class ConversationEngine:
         if kb_sim and kb_sim.get("status") == "success" and not response["recommendations"]:
             recs = kb_sim.get("data", {}).get("recommendations", [])
             response["recommendations"] = [
-                {"title": r.get("title"), "year": r.get("year"), "imdb_id": r.get("imdb_id")}
+                {
+                    "title": r.get("title"), 
+                    "year": r.get("year"), 
+                    "imdb_id": r.get("imdb_id"),
+                    "poster_url": f"https://image.tmdb.org/t/p/w200{r.get('poster_path')}" if r.get("poster_path") else ""
+                }
                 for r in recs
             ]
         # KB top rated movie list
         kb_top = tool_outputs.get("kb_top_rated")
         if kb_top and kb_top.get("status") == "success" and not response["recommendations"]:
             response["recommendations"] = kb_top.get("data", {}).get("movies", [])
-        if not response["recommendations"]:
-            for list_tool in ("imdb_trending_tamil", "imdb_top_rated_english", "imdb_upcoming"):
-                output = tool_outputs.get(list_tool)
-                if output and output.get("status") == "success":
-                    response["recommendations"] = output.get("data", {}).get("movies", [])
-                    break
+
         archive = tool_outputs.get("archive")
         if archive and archive.get("status") == "success":
             response["download_link"] = archive.get("data", {}).get("download_link", "")
-        web_search = tool_outputs.get("web_search")
-        if web_search and web_search.get("status") == "success":
-            response["sources"] = web_search.get("data", {}).get("sources", [])
+        cinema_search = tool_outputs.get("cinema_search")
+        if cinema_search and cinema_search.get("status") == "success":
+            results = cinema_search.get("data", {}).get("results", [])
+            response["sources"] = [{"title": r.get("title"), "url": r.get("url")} for r in results]
         return response
 
     def _profile_to_dict(self, profile) -> Dict[str, Any]:
@@ -808,11 +913,14 @@ class ConversationEngine:
             lines.append(f"Tool Calls:")
             if timings:
                 for t in timings:
-                    lines.append(
+                    line = (
                         f"- {t['tool']}: status={t['status']}, "
                         f"execution_time_ms={t['execution_time_ms']}, "
-                        f"args={t.get('arguments', {})}"
+                        f"request={t.get('arguments', {})}"
                     )
+                    if t.get("error_detail"):
+                        line += f", error_detail='{t['error_detail']}'"
+                    lines.append(line)
             else:
                 lines.append(f"- none")
             lines.append(f"")
@@ -844,6 +952,14 @@ class ConversationEngine:
             lines.append(json.dumps(response, indent=2, ensure_ascii=False))
             lines.append(f"```")
             lines.append(f"")
+
+            if trace.get("fatal_error"):
+                lines.append(f"### FATAL ERROR")
+                lines.append(f"```python")
+                lines.append(str(trace.get("fatal_error")))
+                lines.append(str(trace.get("fatal_error_tb")))
+                lines.append(f"```")
+                lines.append(f"")
 
             report_text = "\n".join(lines)
             with open(self._REPORT_PATH, "a", encoding="utf-8") as f:

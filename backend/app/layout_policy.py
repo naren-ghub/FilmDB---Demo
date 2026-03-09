@@ -15,6 +15,11 @@ def select_response_mode(
         and bool(similarity.get("data", {}).get("recommendations"))
     )
 
+    # Priority 1: Disambiguation / Clarification
+    for out in tool_outputs.values():
+        if out.get("status") == "disambiguation":
+            return "CLARIFICATION"
+
     if primary_intent == "AVAILABILITY":
         return "AVAILABILITY_FOCUS"
     if primary_intent == "STREAMING_AVAILABILITY":
@@ -44,7 +49,7 @@ def select_response_mode(
     if primary_intent == "ILLEGAL_DOWNLOAD_REQUEST":
         return "EXPLANATION_ONLY"
     if primary_intent == "PERSON_LOOKUP":
-        return "FULL_CARD"
+        return "EXPLANATION_ONLY"
     if primary_intent == "FILMOGRAPHY":
         return "FILMOGRAPHY_LIST"
     if primary_intent == "PLOT_EXPLANATION":
@@ -54,15 +59,7 @@ def select_response_mode(
     if primary_intent == "COMPARISON":
         return "COMPARISON_TABLE"
     if primary_intent == "AWARD_LOOKUP":
-        has_list = False
-        for key in ("imdb_trending_tamil", "imdb_top_rated_english", "imdb_upcoming"):
-            output = tool_outputs.get(key)
-            if output and output.get("status") == "success":
-                movies = output.get("data", {}).get("movies", [])
-                if movies:
-                    has_list = True
-                    break
-        return "RECOMMENDATION_GRID" if has_list else "EXPLANATION_ONLY"
+        return "EXPLANATION_ONLY"
     if primary_intent in ("GREETING", "GENERAL_CONVERSATION"):
         return "EXPLANATION_ONLY"
 

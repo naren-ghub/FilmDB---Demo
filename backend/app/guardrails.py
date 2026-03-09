@@ -17,7 +17,7 @@ def should_block(intent: dict[str, Any], message: str, has_context: bool) -> tup
 
     # NOTE: We no longer block on low confidence.
     # Low confidence queries are handled by the routing matrix
-    # which adds web_search as a fallback tool.
+    # which adds cinema_search as a fallback tool.
     return False, ""
 
 
