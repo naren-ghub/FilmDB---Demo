@@ -552,7 +552,7 @@ api_tools = [
     "imdb_trending_tamil — Trending Tamil movies",
     "imdb_top_rated_english — Top rated English",
     "imdb_upcoming — Upcoming releases by region",
-    "archive — Internet Archive public domain",
+    "archive — Internet Archive public domain (robust multi-field match, popularity sort)",
 ]
 _add_bullet_slide(slide, api_tools, Inches(6.8), Inches(2.5), Inches(6), Inches(5),
                   font_size=13, color=LIGHT_GRAY, bullet_color=ACCENT_ORANGE)
@@ -588,7 +588,7 @@ _text_box(slide, Inches(1), Inches(6.5), Inches(11), Inches(0.5),
 
 
 # ─── Save ──────────────────────────────────────────────────────────────────
-output_path = r"D:\Evolve_Robot_Lab\Project\FilmDB_Demo\FilmDB_Overview.pptx"
+output_path = r"D:\Evolve_Robot_Lab\Project\FilmDB_Demo\FilmDB_Overview.resolved.pptx"
 prs.save(output_path)
 print(f"Presentation saved to: {output_path}")
 print(f"Slides: {len(prs.slides)}")

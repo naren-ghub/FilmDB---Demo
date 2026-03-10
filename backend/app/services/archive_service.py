@@ -7,10 +7,15 @@ from app.utils.tool_formatter import normalize_tool_output
 
 async def run(title: str) -> dict:
     url = "https://archive.org/advancedsearch.php"
-    query = f'title:({title}) AND mediatype:(movies)'
+    # Try exact title phrase, title terms, or general text matching, and sort by downloads to get the most relevant/popular hit
+    query = f'(title:("{title}") OR title:({title}) OR ({title})) AND mediatype:(movies)'
     async with httpx.AsyncClient(timeout=settings.HTTP_TIMEOUT_SECONDS) as client:
         try:
-            resp = await client.get(url, params={"q": query, "output": "json"})
+            resp = await client.get(url, params={
+                "q": query, 
+                "output": "json",
+                "sort[]": "downloads desc"
+            })
             resp.raise_for_status()
             payload = resp.json()
         except Exception:

@@ -35,11 +35,11 @@ TOOL_REGISTRY = {
         "description": "IMDb awards and nominations for a movie",
         "required": [],
     },
-    "cinema_search": {
-        "name": "cinema_search",
-        "description": "Domain-restricted web search for cinema news, reviews, awards, and trends",
-        "required": ["query"],
-    },
+    # "cinema_search": {
+    #     "name": "cinema_search",
+    #     "description": "Domain-restricted web search for cinema news, reviews, awards, and trends",
+    #     "required": ["query"],
+    # },
 
     # ── KB-powered tools ─────────────────────────────────────────────────
     "kb_entity": {

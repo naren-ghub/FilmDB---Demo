@@ -33,10 +33,6 @@ async def run(title: str = "", person: str = "") -> dict[str, Any]:
     if person and not results:
         results = engine.analysis_search_by_person(person, max_results=5)
 
-    # Fallback: try person name even if title was provided but no results found
-    if not results and title:
-        results = engine.analysis_search_by_person(title, max_results=5)
-
     if not results:
         return {
             "status": "not_found",

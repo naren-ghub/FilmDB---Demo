@@ -157,7 +157,7 @@ def _render_chat_history() -> None:
             active_style = "color:#c9a227;font-weight:600;" if is_active else ""
             indicator = "▶ " if is_active else "💬 "
 
-            col_title, col_edit, col_del = st.columns([5, 1, 1])
+            col_title, col_edit, col_del = st.columns([6.5, 1.25, 1.25])
             with col_title:
                 if st.button(
                     f"{indicator}{display_title}",
@@ -202,15 +202,21 @@ def _render_chat_history() -> None:
 
 def render_chat_interface() -> None:
     # ── title bar with kebab menu ──
-    title_col, menu_col = st.columns([6, 1])
-    with title_col:
-        st.markdown(
-            "<div class='filmdb-title'>🍿 <span>Film</span>DB "
-            "<span style='font-size:0.55em;color:#6c6c80;'></span></div>",
-            unsafe_allow_html=True,
-        )
-    with menu_col:
-        _render_kebab_menu()
+    # If currently renaming the chat via the kebab menu, show inline input
+    if st.session_state.get("kebab_renaming"):
+        _render_inline_rename()
+    else:
+        title_col, menu_col = st.columns([6, 1])
+        with title_col:
+            st.markdown(
+                "<div class='filmdb-title' style='display:flex; align-items:center; height:100%; margin:0;'>"
+                "🍿&nbsp;&nbsp;<span>Film</span>DB&nbsp;"
+                "<span style='font-size:0.55em;color:#6c6c80;margin-left:8px;margin-top:8px;'>DEMO</span>"
+                "</div>",
+                unsafe_allow_html=True,
+            )
+        with menu_col:
+            _render_kebab_menu()
 
     # ── starter cards (only when chat is empty) ──
     if not st.session_state.messages:
@@ -241,9 +247,6 @@ def _render_kebab_menu() -> None:
     """Three-dot kebab menu for rename, clear, delete actions on current chat."""
     sessions = st.session_state.get("chat_sessions", {})
     current_sid = st.session_state.session_id
-    current_title = ""
-    if current_sid in sessions:
-        current_title = sessions[current_sid].get("title", "")
 
     with st.popover("⋮", help="Chat options"):
         st.markdown(
@@ -252,42 +255,57 @@ def _render_kebab_menu() -> None:
             unsafe_allow_html=True,
         )
 
-        # ── Rename ──
-        if st.session_state.get("kebab_renaming"):
-            new_name = st.text_input(
-                "New title",
-                value=current_title,
-                key="kebab_rename_input",
-                label_visibility="collapsed",
-            )
-            c1, c2 = st.columns(2)
-            with c1:
-                if st.button("✓ Save", key="kebab_rename_save", use_container_width=True):
-                    if new_name.strip():
-                        # If current session isn't archived yet, archive it first
-                        if current_sid not in sessions and st.session_state.messages:
-                            first_msg = st.session_state.messages[0].get("content", "Untitled")
-                            sessions[current_sid] = {
-                                "title": new_name.strip()[:64],
-                                "messages": list(st.session_state.messages),
-                            }
-                            st.session_state.chat_sessions = sessions
-                        rename_chat_session(current_sid, new_name)
-                    st.session_state.pop("kebab_renaming", None)
-                    st.rerun()
-            with c2:
-                if st.button("✕ Cancel", key="kebab_rename_cancel", use_container_width=True):
-                    st.session_state.pop("kebab_renaming", None)
-                    st.rerun()
-        else:
-            if st.button("✏️  Rename Chat", key="kebab_rename_btn", use_container_width=True):
-                st.session_state["kebab_renaming"] = True
-                st.rerun()
+        # ── Rename (Sets state for inline render) ──
+        if st.button("✏️  Rename Chat", key="kebab_rename_btn", use_container_width=True):
+            st.session_state["kebab_renaming"] = True
+            st.rerun()
 
         # ── Clear Chat ──
         if st.button("🧹  Clear Chat", key="kebab_clear_btn", use_container_width=True,
                       help="Clears all messages but keeps the session"):
             clear_chat_messages()
+            st.rerun()
+
+        # ── Delete Chat ──
+        if st.button("🗑️  Delete Chat", key="kebab_delete_btn", use_container_width=True,
+                      help="Permanently removes this chat"):
+            if current_sid in sessions:
+                delete_chat_session(current_sid)
+            else:
+                st.session_state.messages = []
+                st.session_state.session_id = __import__("uuid").uuid4().__str__()
+            st.rerun()
+
+def _render_inline_rename() -> None:
+    """Renders the rename input field inline instead of inside the popover."""
+    sessions = st.session_state.get("chat_sessions", {})
+    current_sid = st.session_state.session_id
+    current_title = sessions.get(current_sid, {}).get("title", "") if current_sid in sessions else ""
+
+    col_input, col_save, col_cancel = st.columns([5, 1, 1])
+    with col_input:
+        new_name = st.text_input(
+            "New title",
+            value=current_title,
+            key="kebab_rename_input_inline",
+            label_visibility="collapsed",
+        )
+    with col_save:
+        if st.button("✓ Save", key="kebab_rename_save_inline", use_container_width=True):
+            if new_name.strip():
+                if current_sid not in sessions and st.session_state.messages:
+                    first_msg = st.session_state.messages[0].get("content", "Untitled")
+                    sessions[current_sid] = {
+                        "title": new_name.strip()[:64],
+                        "messages": list(st.session_state.messages),
+                    }
+                    st.session_state.chat_sessions = sessions
+                rename_chat_session(current_sid, new_name)
+            st.session_state.pop("kebab_renaming", None)
+            st.rerun()
+    with col_cancel:
+        if st.button("✕ Cancel", key="kebab_rename_cancel_inline", use_container_width=True):
+            st.session_state.pop("kebab_renaming", None)
             st.rerun()
 
         # ── Delete Chat ──
