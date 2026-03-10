@@ -41,4 +41,4 @@ scripts/create_overview_ppt.py
 FilmDB_Overview.pptx
 FilmDB_Overview.resolved.pptx
 FilmDB_Overview_1.pptx
-.ui/.filmdb_users.json
+ui/.filmdb_users.json
