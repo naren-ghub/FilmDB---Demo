@@ -21,11 +21,11 @@ Schema:
 }
 
 Valid primary intents:
-ENTITY_LOOKUP, ANALYTICAL_EXPLANATION, AVAILABILITY, RECOMMENDATION, DOWNLOAD,
+ENTITY_LOOKUP, ANALYTICAL_EXPLANATION, RECOMMENDATION, DOWNLOAD,
 LEGAL_DOWNLOAD, ILLEGAL_DOWNLOAD_REQUEST, STREAMING_AVAILABILITY,
-REVIEWS, TRENDING, UPCOMING, TOP_RATED, STREAMING_DISCOVERY, COMPARISON,
-PERSON_LOOKUP, AWARD_LOOKUP, GREETING, GENERAL_CONVERSATION,
-PLOT_EXPLANATION, CRITIC_SUMMARY, MOVIE_SIMILARITY, FILMOGRAPHY, FILM_ANALYSIS
+REVIEWS, TRENDING, UPCOMING, TOP_RATED, COMPARISON,
+PERSON_LOOKUP, OSCAR_LOOKUP, GENERAL_AWARD_LOOKUP, GREETING, GENERAL_CONVERSATION,
+PLOT_EXPLANATION, CRITIC_REVIEW, MOVIE_SIMILARITY, FILMOGRAPHY, FILM_ANALYSIS, OFFICIAL
 
 Classification rules:
 - "hi", "hello", "hey", greetings → GREETING (confidence: 100)
@@ -44,12 +44,14 @@ Classification rules:
 - "trending movies", "what's popular" → TRENDING
 - "top rated movies" → TOP_RATED
 - "upcoming releases" → UPCOMING
-- "oscar", "nominations", "awards" → AWARD_LOOKUP
-- "review of <movie>", "what do critics say about <movie>" → CRITIC_SUMMARY
-- "what's new on netflix" → STREAMING_DISCOVERY
+- "oscar", "academy awards", "best picture" → OSCAR_LOOKUP
+- "awards", "emmys", "golden globes", "what did they win" → GENERAL_AWARD_LOOKUP
+- "review of <movie>", "what do critics say about <movie>" → CRITIC_REVIEW
+- "what's new on netflix", "where can I stream" → STREAMING_AVAILABILITY
 - "download <movie>" → DOWNLOAD
 - "explain the plot of <movie>", "plot of <movie>" → PLOT_EXPLANATION
 - "filmography of <person>", "movies directed by <person>" → FILMOGRAPHY
+- "official website of <movie>", "official trailer", "links for <movie>" → OFFICIAL
 - When a specific movie title is mentioned → always extract it as an entity
 - When a specific person name is mentioned → always extract it as an entity
 - For COMPARISON: extract BOTH movie or person entities
@@ -62,25 +64,26 @@ Examples:
 - "who is stanley kubrick", "who is miyazaki" → {"primary_intent": "PERSON_LOOKUP", "secondary_intents": [], "entities": [{"type": "person", "value": "Stanley Kubrick"}], "confidence": 95}
 - "What is Inception about?", "give overview of kottukkali" → {"primary_intent": "ENTITY_LOOKUP", "secondary_intents": [], "entities": [{"type": "movie", "value": "Inception"}], "confidence": 95}
 - "interstellar movie card", "show me the poster for avatar", "details of matrix" → {"primary_intent": "ENTITY_LOOKUP", "secondary_intents": [], "entities": [{"type": "movie", "value": "Interstellar"}], "confidence": 95}
-- "Why is Kubrick's A Clockwork Orange controversial" → {"primary_intent": "ANALYTICAL_EXPLANATION", "secondary_intents": ["ENTITY_LOOKUP"], "entities": [{"type": "movie", "value": "A Clockwork Orange"}, {"type": "person", "value": "Stanley Kubrick"}], "confidence": 90}
-- "where can I stream The Batman" → {"primary_intent": "STREAMING_AVAILABILITY", "secondary_intents": ["AVAILABILITY"], "entities": [{"type": "movie", "value": "The Batman"}], "confidence": 95}
+- "Why is Kubrick's A Clockwork Orange controversial" → {"primary_intent": "ANALYTICAL_EXPLANATION", "secondary_intents": ["FILM_ANALYSIS"], "entities": [{"type": "movie", "value": "A Clockwork Orange"}, {"type": "person", "value": "Stanley Kubrick"}], "confidence": 90}
+- "where can I stream The Batman" → {"primary_intent": "STREAMING_AVAILABILITY", "secondary_intents": [], "entities": [{"type": "movie", "value": "The Batman"}], "confidence": 95}
 - "movies similar to Interstellar" → {"primary_intent": "MOVIE_SIMILARITY", "secondary_intents": ["RECOMMENDATION"], "entities": [{"type": "movie", "value": "Interstellar"}], "confidence": 90}
-- "where can i download inception" → {"primary_intent": "DOWNLOAD", "secondary_intents": ["ILLEGAL_DOWNLOAD_REQUEST"], "entities": [{"type": "movie", "value": "Inception"}], "confidence": 95}
-- "legal download for avatar" → {"primary_intent": "LEGAL_DOWNLOAD", "secondary_intents": ["DOWNLOAD"], "entities": [{"type": "movie", "value": "Avatar"}], "confidence": 95}
+- "where can i download inception" → {"primary_intent": "DOWNLOAD", "secondary_intents": [""], "entities": [{"type": "movie", "value": "Inception"}], "confidence": 95}
+- "legal download for avatar" → {"primary_intent": "LEGAL_DOWNLOAD", "secondary_intents": [""], "entities": [{"type": "movie", "value": "Avatar"}], "confidence": 95}
 - "trending tamil movies", "what are the current trending films" → {"primary_intent": "TRENDING", "secondary_intents": [], "entities": [{"type": "language", "value": "tamil"}], "confidence": 95}
 - "top rated english films" → {"primary_intent": "TOP_RATED", "secondary_intents": [], "entities": [{"type": "language", "value": "english"}], "confidence": 95}
 - "upcoming releases 2026", "new movies coming out soon" → {"primary_intent": "UPCOMING", "secondary_intents": [], "entities": [{"type": "year", "value": "2026"}], "confidence": 95}
-- "what's new on netflix" → {"primary_intent": "STREAMING_DISCOVERY", "secondary_intents": [], "entities": [{"type": "platform", "value": "netflix"}], "confidence": 95}
-- "oscar nominations 2026", "what awards did hitman win" → {"primary_intent": "AWARD_LOOKUP", "secondary_intents": [], "entities": [{"type": "year", "value": "2026"}], "confidence": 95}
-- "explain the plot of Inception" → {"primary_intent": "PLOT_EXPLANATION", "secondary_intents": [], "entities": [{"type": "movie", "value": "Inception"}], "confidence": 95}
-- "what do critics say about The Dark Knight" → {"primary_intent": "CRITIC_SUMMARY", "secondary_intents": ["REVIEWS"], "entities": [{"type": "movie", "value": "The Dark Knight"}], "confidence": 95}
-- "stanley kubrick filmography", "movies directed by Scorsese" → {"primary_intent": "FILMOGRAPHY", "secondary_intents": [], "entities": [{"type": "person", "value": "Stanley Kubrick"}], "confidence": 95}
-- "compare Inception and Interstellar" → {"primary_intent": "COMPARISON", "secondary_intents": [], "entities": [{"type": "movie", "value": "Inception"}, {"type": "movie", "value": "Interstellar"}], "confidence": 95}
-- "analyze Antonioni's visual style" → {"primary_intent": "FILM_ANALYSIS", "secondary_intents": [], "entities": [{"type": "person", "value": "Antonioni"}], "confidence": 90}
-- "suggest good thriller movies released past 2 weeks" → {"primary_intent": "RECOMMENDATION", "secondary_intents": [], "entities": [{"type": "genre", "value": "thriller"}], "confidence": 90}
-- "Which movie do you think is great: 2001 or Interstellar?" → {"primary_intent": "COMPARISON", "secondary_intents": ["FILM_ANALYSIS", "CRITIC_SUMMARY", "PLOT_EXPLANATION"], "entities": [{"type": "movie", "value": "2001: A Space Odyssey"}, {"type": "movie", "value": "Interstellar"}], "confidence": 95}
-- "hello", "what's up", "who are you" → {"primary_intent": "GENERAL_CONVERSATION", "secondary_intents": [], "entities": [], "confidence": 100}
-- "is cgi ruining films" → {"primary_intent": "FILM_ANALYSIS", "secondary_intents": ["GENERAL_CONVERSATION"], "entities": [], "confidence": 80}
+- "what's new on netflix" → {"primary_intent": "STREAMING_AVAILABILITY", "secondary_intents": [], "entities": [{"type": "platform", "value": "netflix"}], "confidence": 95}
+- "oscar nominations 2026", "what academy awards did hitman win" → {"primary_intent": "OSCAR_LOOKUP", "secondary_intents": ["GENERAL_AWARD_LOOKUP"], "entities": [{"type": "year", "value": "2026"}], "confidence": 95}
+- "what awards has DiCaprio won", "golden globes for inception" → {"primary_intent": "GENERAL_AWARD_LOOKUP", "secondary_intents": ["OSCAR_LOOKUP"], "entities": [{"type": "person", "value": "DiCaprio"}], "confidence": 95}
+- "explain the plot of Inception" → {"primary_intent": "PLOT_EXPLANATION", "secondary_intents": ["FILM_ANALYSIS"], "entities": [{"type": "movie", "value": "Inception"}], "confidence": 95}
+- "what do critics say about The Dark Knight" → {"primary_intent": "CRITIC_REVIEW", "secondary_intents": ["FILM_ANALYSIS"], "entities": [{"type": "movie", "value": "The Dark Knight"}], "confidence": 95}
+- "stanley kubrick filmography", "movies directed by Scorsese" → {"primary_intent": "FILMOGRAPHY", "secondary_intents": ["PERSON_LOOKUP","FILM_ANALYSIS"], "entities": [{"type": "person", "value": "Stanley Kubrick"}], "confidence": 95}
+- "compare Inception and Interstellar" → {"primary_intent": "COMPARISON", "secondary_intents": ["FILM_ANALYSIS","PLOT_EXPLANATION"], "entities": [{"type": "movie", "value": "Inception"}, {"type": "movie", "value": "Interstellar"},{"type": "movie", "value": "Inception"}], "confidence": 95}
+- "analyze Antonioni's visual style" → {"primary_intent": "FILM_ANALYSIS", "secondary_intents": ["CRITIC_REVIEW","PLOT_EXPLANATION"], "entities": [{"type": "person", "value": "Antonioni"}], "confidence": 90}
+- "suggest good thriller movies released past 2 weeks" → {"primary_intent": "RECOMMENDATION", "secondary_intents": ["TRENDING"], "entities": [{"type": "genre", "value": "thriller"}], "confidence": 90}
+- "Which movie do you think is great: 2001 or Interstellar?" → {"primary_intent": "COMPARISON", "secondary_intents": ["FILM_ANALYSIS", "CRITIC_REVIEW", "PLOT_EXPLANATION"], "entities": [{"type": "movie", "value": "2001: A Space Odyssey"}, {"type": "movie", "value": "Interstellar"}], "confidence": 95}
+- "hello", "what's up", "who are you" → {"primary_intent": "GREETING", "secondary_intents": ["GENERAL_CONVERSATION"], "entities": [], "confidence": 100}
+- "is cgi ruining films" → {"primary_intent": "FILM_ANALYSIS", "secondary_intents": [], "entities": [], "confidence": 80}
 
 IMPORTANT: Always return confidence >= 70 for any film-related query.
 Return confidence 100 for greetings.

@@ -20,8 +20,6 @@ def select_response_mode(
         if out.get("status") == "disambiguation":
             return "CLARIFICATION"
 
-    if primary_intent == "AVAILABILITY":
-        return "AVAILABILITY_FOCUS"
     if primary_intent == "STREAMING_AVAILABILITY":
         return "AVAILABILITY_FOCUS"
     if primary_intent == "RECOMMENDATION":
@@ -40,8 +38,6 @@ def select_response_mode(
         return "RECOMMENDATION_GRID"
     if primary_intent == "TOP_RATED":
         return "RECOMMENDATION_GRID"
-    if primary_intent == "STREAMING_DISCOVERY":
-        return "RECOMMENDATION_GRID"
     if primary_intent == "DOWNLOAD":
         return "MINIMAL_CARD"
     if primary_intent == "LEGAL_DOWNLOAD":
@@ -54,16 +50,16 @@ def select_response_mode(
         return "FILMOGRAPHY_LIST"
     if primary_intent == "PLOT_EXPLANATION":
         return "ANALYSIS_TEXT"
-    if primary_intent == "CRITIC_SUMMARY":
+    if primary_intent == "CRITIC_REVIEW":
         return "ANALYSIS_TEXT"
     if primary_intent == "COMPARISON":
         return "COMPARISON_TABLE"
-    if primary_intent == "AWARD_LOOKUP":
+    if primary_intent in ("OSCAR_LOOKUP", "GENERAL_AWARD_LOOKUP"):
         return "EXPLANATION_ONLY"
     if primary_intent in ("GREETING", "GENERAL_CONVERSATION"):
         return "EXPLANATION_ONLY"
 
-    if "AVAILABILITY" in secondary_intents and has_streaming:
+    if "STREAMING_AVAILABILITY" in secondary_intents and has_streaming:
         return "EXPLANATION_PLUS_AVAILABILITY"
     if "RECOMMENDATION" in secondary_intents and has_recs:
         return "RECOMMENDATION_GRID"

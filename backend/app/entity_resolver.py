@@ -89,8 +89,8 @@ def _extract_candidate(message: str, intent: dict[str, Any]) -> str:
     
     expected_type = None
     if primary in ("PERSON_LOOKUP", "FILMOGRAPHY"): expected_type = "person"
-    elif primary in ("AWARD_LOOKUP",): expected_type = "award_event"
-    elif primary in ("ENTITY_LOOKUP", "PLOT_EXPLANATION", "CRITIC_SUMMARY", "MOVIE_SIMILARITY", "COMPARISON", "REVIEWS", "ANALYTICAL_EXPLANATION", "RECOMMENDATION", "DOWNLOAD", "LEGAL_DOWNLOAD", "STREAMING_AVAILABILITY"):
+    elif primary in ("OSCAR_LOOKUP", "GENERAL_AWARD_LOOKUP"): expected_type = "award_event"
+    elif primary in ("ENTITY_LOOKUP", "PLOT_EXPLANATION", "CRITIC_REVIEW", "MOVIE_SIMILARITY", "COMPARISON", "REVIEWS", "ANALYTICAL_EXPLANATION", "RECOMMENDATION", "DOWNLOAD", "LEGAL_DOWNLOAD", "STREAMING_AVAILABILITY"):
         expected_type = "movie"
 
     valid_core_types = {"movie", "person", "award_event"}
@@ -121,13 +121,13 @@ def _infer_entity_type(message: str, intent: dict[str, Any]) -> str | None:
     primary = intent.get("primary_intent", "")
     if primary in ("PERSON_LOOKUP", "FILMOGRAPHY"):
         return "person"
-    if primary in ("AWARD_LOOKUP",):
+    if primary in ("OSCAR_LOOKUP", "GENERAL_AWARD_LOOKUP"):
         return "award_event"
-    if primary in ("TRENDING", "UPCOMING", "TOP_RATED", "STREAMING_DISCOVERY"):
+    if primary in ("TRENDING", "UPCOMING", "TOP_RATED"):
         return "catalog"
     if primary in ("DOWNLOAD", "LEGAL_DOWNLOAD", "STREAMING_AVAILABILITY"):
         return "movie"
-    if primary in ("ENTITY_LOOKUP", "PLOT_EXPLANATION", "CRITIC_SUMMARY",
+    if primary in ("ENTITY_LOOKUP", "PLOT_EXPLANATION", "CRITIC_REVIEW",
                    "MOVIE_SIMILARITY", "COMPARISON", "REVIEWS",
                    "ANALYTICAL_EXPLANATION", "RECOMMENDATION"):
         return "movie"

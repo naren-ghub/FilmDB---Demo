@@ -9,18 +9,18 @@ ROUTING_MATRIX: dict[str, dict[str, list[str]]] = {
         "forbidden": ["archive"],
     },
     "ANALYTICAL_EXPLANATION": {
-        "required": ["kb_plot", "kb_film_analysis", "cinema_search"],
-        "optional": ["kb_critic", "tmdb", "wikipedia"],
-        "forbidden": ["archive"],
-    },
-    "PLOT_EXPLANATION": {
-        "required": ["kb_plot"],
-        "optional": ["kb_entity", "wikipedia"],
+        "required": ["kb_film_analysis", "kb_critic_review","kb_plot_analysis"],
+        "optional": ["wikipedia_service","cinema_search"],
         "forbidden": [],
     },
-    "CRITIC_SUMMARY": {
-        "required": ["kb_critic"],
-        "optional": ["kb_entity", "tmdb", "cinema_search"],
+    "PLOT_EXPLANATION": {
+        "required": ["kb_plot_analysis"],
+        "optional": ["wikipedia","cinema_search"],
+        "forbidden": [],
+    },
+    "CRITIC_REVIEW": {
+        "required": ["kb_critic_review","kb_film_analysis"],
+        "optional": ["cinema_search"],
         "forbidden": [],
     },
     "MOVIE_SIMILARITY": {
@@ -34,18 +34,18 @@ ROUTING_MATRIX: dict[str, dict[str, list[str]]] = {
         "forbidden": [],
     },
     "REVIEWS": {
-        "required": ["kb_critic"],
-        "optional": ["cinema_search"],
+        "required": ["kb_critic_review","cinema_search"],
+        "optional": ["wikipedia_service"],
         "forbidden": [],
     },
     "TOP_RATED": {
-        "required": ["kb_top_rated"],
+        "required": ["kb_top_rated","wikipedia_service"],
         "optional": ["cinema_search"],
         "forbidden": [],
     },
     "COMPARISON": {
-        "required": ["kb_comparison", "cinema_search"],
-        "optional": ["wikipedia", "kb_filmography", "tmdb"],
+        "required": ["kb_comparison", "kb_filmography","kb_film_analysis","kb_critic_review"],
+        "optional": ["wikipedia","cinema_search"],
         "forbidden": ["archive"],
     },
     "FILMOGRAPHY": {
@@ -55,28 +55,17 @@ ROUTING_MATRIX: dict[str, dict[str, list[str]]] = {
     },
     "PERSON_LOOKUP": {
         "required": ["kb_filmography", "wikipedia"],
-        "optional": ["tmdb", "kb_film_analysis"],
+        "optional": ["tmdb", "kb_film_analysis","cinema_search"],
         "forbidden": [],
     },
     "FILM_ANALYSIS": {
-        "required": ["kb_film_analysis", "wikipedia"],
-        "optional": ["kb_entity", "kb_plot"],
-        "forbidden": [],
-    },
-    # ── API-first routes (live data required) ────────────────────────────
-    "CRITIC_REVIEW": {
-        "required": ["kb_critic", "cinema_search"],
-        "optional": [],
-        "forbidden": [],
-    },
-    "AVAILABILITY": {
-        "required": ["kb_entity"],
-        "optional": ["watchmode", "cinema_search"],
+        "required": ["kb_film_analysis", "kb_critic_review","kb_plot_analysis"],
+        "optional": ["wikipedia_service","cinema_search"],
         "forbidden": [],
     },
     "STREAMING_AVAILABILITY": {
-        "required": ["kb_entity"],
-        "optional": ["watchmode", "cinema_search"],
+        "required": ["watchmode"],
+        "optional": ["kb_entity_lookup"],
         "forbidden": [],
     },
     "DOWNLOAD": {
@@ -94,8 +83,13 @@ ROUTING_MATRIX: dict[str, dict[str, list[str]]] = {
         "optional": [],
         "forbidden": ["archive"],
     },
+    "UPCOMING": {
+        "required": ["cinema_search"],
+        "optional": [],
+        "forbidden": [],
+    },
     "TRENDING": {
-        "required": ["cinema_search",],
+        "required": ["cinema_search"],
         "optional": [],
         "forbidden": [],
     },
@@ -104,20 +98,15 @@ ROUTING_MATRIX: dict[str, dict[str, list[str]]] = {
         "optional": ["wikipedia"],
         "forbidden": [],
     },
-    "UPCOMING": {
-        "required": ["cinema_search"],
-        "optional": [],
-        "forbidden": [],
-    },
-    "AWARD_LOOKUP": {
+    "OSCAR_LOOKUP": {
         "required": ["kb_awards", "wikipedia"],
-        "optional": ["imdb_awards", "cinema_search"],
+        "optional": ["cinema_search"],
         "forbidden": ["archive"],
     },
-    "STREAMING_DISCOVERY": {
-        "required": ["kb_entity", "cinema_search"],
-        "optional": ["watchmode"],
-        "forbidden": [],
+    "GENERAL_AWARD_LOOKUP": {
+        "required": ["imdb_awards","kb_awards"],
+        "optional": ["wikipedia"],
+        "forbidden": ["archive"],
     },
     # ── Non-tool intents ─────────────────────────────────────────────────
     "GREETING": {
@@ -126,8 +115,8 @@ ROUTING_MATRIX: dict[str, dict[str, list[str]]] = {
         "forbidden": [],
     },
     "GENERAL_CONVERSATION": {
-        "required": ["cinema_search"],
-        "optional": ["wikipedia"],
+        "required": [],
+        "optional": [],
         "forbidden": [],
     },
 }

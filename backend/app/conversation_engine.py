@@ -37,7 +37,7 @@ from app import services
 from app.services.kb_service import (
     kb_entity_lookup,
     kb_plot_analysis,
-    kb_critic_summary,
+    kb_critic_review,
     kb_movie_similarity,
     kb_top_rated,
     kb_person_filmography,
@@ -306,19 +306,27 @@ class ConversationEngine:
         resolved_entity: dict[str, Any],
         profile,
     ) -> list[dict[str, Any]]:
-        title = resolved_entity.get("entity_value") or message
-        if resolved_entity.get("entity_type") == "person":
-            person_name = resolved_entity.get("entity_value") or message
-        else:
-            person_name = self._extract_person_from_intent(intent) or message
+        primary = intent.get("primary_intent", "")
+        
+        extracted_movie = None
+        extracted_person = None
+        if resolved_entity.get("entity_type") == "movie":
+            extracted_movie = resolved_entity.get("entity_value")
+        elif resolved_entity.get("entity_type") == "person":
+            extracted_person = resolved_entity.get("entity_value")
+            
+        extracted_person = extracted_person or self._extract_person_from_intent(intent)
+
+        title = extracted_movie or message
+        person_name = extracted_person or ""
+
         region = None
         if profile and getattr(profile, "region", None):
             region = profile.region
 
         # Extract second entity for comparison
-        title_b = None
-        person_name_b = None
-        primary = intent.get("primary_intent", "")
+        title_b = ""
+        person_name_b = ""
         if primary == "COMPARISON":
             entities = intent.get("entities", [])
             movie_entities = [e for e in entities if isinstance(e, dict) and e.get("type") == "movie"]
@@ -359,14 +367,19 @@ class ConversationEngine:
         for name in tool_names:
             args: dict[str, Any] = {}
             # ── API tools ────────────────────────────────────────────────
-            if name in ("wikipedia", "archive", "imdb_awards"):
+            if name in ("wikipedia", "archive"):
                 args = {"title": title}
+            elif name == "imdb_awards":
+                if extracted_person and not extracted_movie:
+                    args = {"person_name": extracted_person}
+                else:
+                    args = {"title": title}
             elif name == "tmdb":
                 args = {"title": title}
                 if resolved_entity.get("year"):
                     args["year"] = resolved_entity.get("year")
-                if primary in ("PERSON_LOOKUP", "FILMOGRAPHY", "COMPARISON") or resolved_entity.get("entity_type") == "person" or person_name_b:
-                    args = {"name": person_name}
+                if primary in ("PERSON_LOOKUP", "FILMOGRAPHY") or extracted_person or person_name_b:
+                    args = {"name": person_name or message}
             elif name == "watchmode":
                 args = {"title": title, "region": region or "IN"}
             elif name == "cinema_search":
@@ -383,10 +396,10 @@ class ConversationEngine:
                 if language_filter:
                     args["language"] = language_filter
             elif name == "kb_filmography":
-                args = {"name": person_name}
+                args = {"name": person_name or message}
             elif name == "kb_awards":
-                if person_name and not title:
-                    args = {"person_name": person_name}
+                if extracted_person and not extracted_movie:
+                    args = {"person_name": extracted_person}
                 else:
                     args = {"movie_title": title}
             elif name == "kb_comparison":
@@ -398,12 +411,13 @@ class ConversationEngine:
 
             # ── Add secondary call for Comparison if entity B exists ──
             if primary == "COMPARISON":
-                if title_b and name in ("wikipedia", "kb_entity", "kb_plot", "kb_critic", "tmdb"):
+                if title_b and name in ("wikipedia", "kb_entity", "kb_plot", "kb_critic", "tmdb", "kb_film_analysis"):
                     args_b = dict(args)
                     args_b["title"] = title_b
+                    if "person" in args_b: args_b["person"] = ""
                     if name == "tmdb": args_b.pop("name", None)
                     tool_calls.append({"name": f"{name}_b", "arguments": args_b})
-                if person_name_b and name in ("wikipedia", "kb_filmography", "tmdb", "kb_film_analysis"):
+                elif person_name_b and name in ("wikipedia", "kb_filmography", "tmdb", "kb_film_analysis"):
                     args_b = dict(args)
                     if "name" in args_b: args_b["name"] = person_name_b
                     if "person" in args_b: args_b["person"] = person_name_b
@@ -441,10 +455,15 @@ class ConversationEngine:
 
     def _apply_award_override(self, message: str, intent: dict[str, Any]) -> dict[str, Any]:
         lowered = message.lower()
-        if any(k in lowered for k in ["oscar", "oscars", "academy awards", "nominations", "best picture"]):
+        if any(k in lowered for k in ["oscar", "oscars", "academy awards", "best picture"]):
             intent = dict(intent)
-            intent["primary_intent"] = "AWARD_LOOKUP"
+            intent["primary_intent"] = "OSCAR_LOOKUP"
             intent["confidence"] = 100
+        elif any(k in lowered for k in ["award", "awards", "golden globe", "emmy", "grammy"]):
+            if intent.get("primary_intent") not in ("OSCAR_LOOKUP", "GENERAL_AWARD_LOOKUP"):
+                intent = dict(intent)
+                intent["primary_intent"] = "GENERAL_AWARD_LOOKUP"
+                intent["confidence"] = 100
         return intent
 
     def _apply_download_override(self, message: str, intent: dict[str, Any]) -> dict[str, Any]:
@@ -476,7 +495,7 @@ class ConversationEngine:
     def _needs_grounding_retry(self, tool_outputs: dict[str, dict], final_text: str, intent: dict[str, Any]) -> bool:
         primary_intent = intent.get("primary_intent", "")
         # Only enforce rating/year inclusion for general entity lookups and recommendations
-        if primary_intent not in ("ENTITY_LOOKUP", "RECOMMENDATION", "CRITIC_SUMMARY"):
+        if primary_intent not in ("ENTITY_LOOKUP", "RECOMMENDATION", "CRITIC_REVIEW"):
             return False
 
         # Check API IMDb data
@@ -599,12 +618,24 @@ class ConversationEngine:
                 imdb_id = engine.resolve_title_to_imdb_id(title)
             
             for call in target_calls:
-                if imdb_id:
-                    call.setdefault("arguments", {})["imdb_id"] = imdb_id
+                call_args = call.setdefault("arguments", {})
+                resolved_id = imdb_id
+                
+                if "person_name" in call_args and call_args["person_name"]:
+                    engine = FilmDBQueryEngine.get_instance()
+                    res = engine.person_filmography(call_args["person_name"])
+                    if res and "nconst" in res:
+                        resolved_id = res["nconst"]
+                elif not resolved_id:
+                    engine = FilmDBQueryEngine.get_instance()
+                    resolved_id = engine.resolve_title_to_imdb_id(call_args.get("title", ""))
+                
+                if resolved_id:
+                    call_args["imdb_id"] = resolved_id
                 else:
                     call_name = call.get("name")
-                    title = call.get("arguments", {}).get("title", "")
-                    outputs[call_name] = {"status": "not_found", "data": {"title": title, "reason": "imdb_id_not_found"}}
+                    title_or_person = call_args.get("title") or call_args.get("person_name") or ""
+                    outputs[call_name] = {"status": "not_found", "data": {"query": title_or_person, "reason": "imdb_id_not_found"}}
 
         for call in tool_calls:
             tool_name = call.get("name")
@@ -702,7 +733,7 @@ class ConversationEngine:
         if base_name == "kb_plot":
             return kb_plot_analysis.run(args.get("title", ""))
         if base_name == "kb_critic":
-            return kb_critic_summary.run(args.get("title", ""))
+            return kb_critic_review.run(args.get("title", ""))
         if base_name == "kb_similarity":
             return kb_movie_similarity.run(args.get("title", ""))
         if tool_name == "kb_top_rated":
