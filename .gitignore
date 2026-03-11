@@ -44,3 +44,13 @@ FilmDB_Overview_1.pptx
 ui/.filmdb_users.json
 agent_report/v2_pipeline_implementation.md.resolved
 ui/.filmdb_users.json
+rag/crawlers/curated_crawler.py
+test_rag.py
+test_resolver.py
+ui/.filmdb_users.json
+rag/kaagle/
+rag/crawlers/
+rag/data/
+production_crawler.py
+
+

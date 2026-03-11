@@ -541,14 +541,13 @@ class ConversationEngine:
 
     def _extract_person_from_intent(self, intent: dict[str, Any]) -> str | None:
         entities = intent.get("entities", [])
-        if entities:
-            first_entity = entities[0]
-            if isinstance(first_entity, dict):
-                entity_type = str(first_entity.get("type", "")).lower()
+        for ent in entities:
+            if isinstance(ent, dict):
+                entity_type = str(ent.get("type", "")).lower()
                 if entity_type in ("person", "director", "actor", "filmmaker", "creator"):
-                    return str(first_entity.get("value"))
-                return None
-            return str(first_entity)
+                    val = ent.get("value")
+                    if val:
+                        return str(val)
         return None
 
     async def _execute_tools(
