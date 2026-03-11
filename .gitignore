@@ -51,6 +51,5 @@ ui/.filmdb_users.json
 rag/kaagle/
 rag/crawlers/
 rag/data/
-production_crawler.py
-
-
+production_crawler_log.txt
+crawler_test_log.txt
