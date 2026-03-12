@@ -28,6 +28,8 @@ class User(Base):
     __tablename__ = "users"
 
     id = Column(String, primary_key=True, default=_uuid)
+    username = Column(String, unique=True, nullable=True)   # display username (case-preserved)
+    password_hash = Column(String, nullable=True)           # bcrypt hash
     created_at = Column(DateTime, default=_now)
     updated_at = Column(DateTime, default=_now)
 
@@ -37,11 +39,12 @@ class UserProfile(Base):
 
     user_id = Column(String, ForeignKey("users.id"), primary_key=True)
     region = Column(String)
-    preferred_language = Column(String)
-    subscribed_platforms = Column(JSON)
-    favorite_genres = Column(JSON)
-    favorite_movies = Column(JSON)
-    response_style = Column(String)
+    # Field names aligned with frontend personalization form
+    platforms = Column(JSON)       # formerly subscribed_platforms
+    genres = Column(JSON)          # formerly favorite_genres
+    fav_movies = Column(JSON)      # formerly favorite_movies
+    fav_actors = Column(JSON)      # NEW — collected by frontend but previously ignored
+    fav_directors = Column(JSON)   # NEW — collected by frontend but previously ignored
     created_at = Column(DateTime, default=_now)
     updated_at = Column(DateTime, default=_now)
 
@@ -129,9 +132,56 @@ class QueryAnalytics(Base):
     created_at = Column(DateTime, default=_now)
 
 
+class RequestLog(Base):
+    """Full query-to-response trace for admin review and validation."""
+    __tablename__ = "request_logs"
+
+    id = Column(String, primary_key=True, default=_uuid)
+    session_id = Column(String, ForeignKey("sessions.id"), nullable=True)
+    user_id = Column(String, nullable=True)
+
+    # ── Request ──
+    user_message = Column(Text)
+    resolved_message = Column(Text)       # after pronoun resolution
+
+    # ── Intent ──
+    primary_intent = Column(String)
+    intent_confidence = Column(Integer)
+    entities = Column(JSON)
+
+    # ── Entity Resolution ──
+    entity_type = Column(String)          # "movie" | "person"
+    entity_value = Column(String)
+
+    # ── Routing & Tools ──
+    required_tools = Column(JSON)
+    optional_tools = Column(JSON)
+    approved_tools = Column(JSON)
+    rejected_tools = Column(JSON)
+    tool_timings = Column(JSON)           # [{tool, status, time_ms, error}]
+    cache_hits = Column(JSON)
+    cache_misses = Column(JSON)
+
+    # ── Response ──
+    response_mode = Column(String)
+    text_response = Column(Text)
+    response_json = Column(JSON)          # full response dict
+
+    # ── Context ──
+    session_context_before = Column(JSON)
+    session_context_after = Column(JSON)
+
+    # ── Metadata ──
+    total_time_ms = Column(Integer)
+    error = Column(Text)                  # populated if a fatal error occurred
+    created_at = Column(DateTime, default=_now)
+
+
 def init_db() -> None:
     Base.metadata.create_all(bind=engine)
     _ensure_session_context_columns()
+    _ensure_user_columns()
+    _ensure_user_profile_columns()
 
 
 def _ensure_session_context_columns() -> None:
@@ -151,3 +201,37 @@ def _ensure_session_context_columns() -> None:
         if "entity_type" not in existing:
             conn.exec_driver_sql("ALTER TABLE session_context ADD COLUMN entity_type TEXT")
         conn.commit()
+
+
+def _ensure_user_columns() -> None:
+    """Migrate existing users table to include username and password_hash."""
+    if not settings.DATABASE_URL.startswith("sqlite"):
+        return
+    with engine.connect() as conn:
+        try:
+            result = conn.exec_driver_sql("PRAGMA table_info(users)")
+            existing = {row[1] for row in result.fetchall()}
+            if "username" not in existing:
+                conn.exec_driver_sql("ALTER TABLE users ADD COLUMN username TEXT")
+            if "password_hash" not in existing:
+                conn.exec_driver_sql("ALTER TABLE users ADD COLUMN password_hash TEXT")
+            conn.commit()
+        except Exception:
+            pass
+
+
+def _ensure_user_profile_columns() -> None:
+    """Migrate user_profiles table to use aligned field names."""
+    if not settings.DATABASE_URL.startswith("sqlite"):
+        return
+    with engine.connect() as conn:
+        try:
+            result = conn.exec_driver_sql("PRAGMA table_info(user_profiles)")
+            existing = {row[1] for row in result.fetchall()}
+            # Add new aligned columns (old ones remain for any existing rows)
+            for col in ["platforms", "genres", "fav_movies", "fav_actors", "fav_directors"]:
+                if col not in existing:
+                    conn.exec_driver_sql(f"ALTER TABLE user_profiles ADD COLUMN {col} JSON")
+            conn.commit()
+        except Exception:
+            pass

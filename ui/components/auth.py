@@ -1,25 +1,25 @@
 """
 FilmDB – Authentication & Onboarding
 ======================================
-• Login modal – authenticates against local persistence
-• Personalization modal – saves profile to disk
+• Login tab    – authenticates against SQLite
+• Register tab – creates a new account + triggers personalization
+• Personalization modal – saves profile to SQLite
 • Once completed, never shown again for that user
 """
 
 import streamlit as st
 from utils.persistence import (
-    user_exists,
-    register_user,
     authenticate,
-    save_profile,
+    get_chat_sessions,
     get_profile,
     has_profile,
-    set_last_active_user,
-    get_chat_sessions,
+    register_user_ui,
+    save_profile,
+    user_exists,
 )
 
 
-# ─────────────────────────  LOGIN  ─────────────────────────
+# ─────────────────────────  LOGIN / REGISTER  ─────────────────────────
 def show_login_modal() -> None:
     # Hide sidebar during auth and adjust padding
     st.markdown(
@@ -30,7 +30,6 @@ def show_login_modal() -> None:
         unsafe_allow_html=True,
     )
 
-    # Vertical spacer to center the card
     st.markdown("<div style='height:10vh;'></div>", unsafe_allow_html=True)
 
     _col, centre, _col2 = st.columns([1.2, 1, 1.2])
@@ -45,36 +44,64 @@ def show_login_modal() -> None:
             unsafe_allow_html=True,
         )
 
-        with st.form("login_form", clear_on_submit=False):
-            username = st.text_input("Username", placeholder="Enter your username")
-            password = st.text_input("Password", type="password", placeholder="••••••••")
-            submitted = st.form_submit_button("Continue", use_container_width=True)
+        tab_login, tab_register = st.tabs(["🔑 Login", "✨ Register"])
 
-            if submitted:
-                if not username or not password:
-                    st.error("Please provide both username and password.")
-                else:
-                    uname = username.strip()
-                    if user_exists(uname):
-                        # ── existing user: authenticate ──
-                        if authenticate(uname, password):
+        # ── Login Tab ──────────────────────────────────────────────────────────
+        with tab_login:
+            with st.form("login_form", clear_on_submit=False):
+                username = st.text_input("Username", placeholder="Enter your username", key="login_uname")
+                password = st.text_input("Password", type="password", placeholder="••••••••", key="login_pw")
+                submitted = st.form_submit_button("Login", use_container_width=True)
+
+                if submitted:
+                    if not username or not password:
+                        st.error("Please provide both username and password.")
+                    else:
+                        uname = username.strip()
+                        if not user_exists(uname):
+                            st.error("No account found. Please register first.")
+                        elif authenticate(uname, password):
                             _login_user(uname)
                         else:
                             st.error("Incorrect password. Please try again.")
+
+        # ── Register Tab ───────────────────────────────────────────────────────
+        with tab_register:
+            with st.form("register_form", clear_on_submit=False):
+                new_username = st.text_input("Choose a username", placeholder="e.g. cinephile_42", key="reg_uname")
+                new_password = st.text_input("Choose a password", type="password", placeholder="Min. 6 characters", key="reg_pw")
+                confirm_pw = st.text_input("Confirm password", type="password", placeholder="••••••••", key="reg_pw2")
+                reg_submitted = st.form_submit_button("Create Account", use_container_width=True)
+
+                if reg_submitted:
+                    errors = []
+                    if not new_username.strip():
+                        errors.append("Username cannot be empty.")
+                    elif len(new_username.strip()) < 3:
+                        errors.append("Username must be at least 3 characters.")
+                    if len(new_password) < 6:
+                        errors.append("Password must be at least 6 characters.")
+                    if new_password != confirm_pw:
+                        errors.append("Passwords do not match.")
+                    if errors:
+                        for e in errors:
+                            st.error(e)
+                    elif user_exists(new_username.strip()):
+                        st.error("That username is already taken. Please choose another.")
                     else:
-                        # ── new user: register ──
-                        register_user(uname, password)
-                        _login_user(uname)
+                        ok = register_user_ui(new_username.strip(), new_password)
+                        if ok:
+                            st.success("Account created! Setting up your profile…")
+                            _login_user(new_username.strip())
+                        else:
+                            st.error("Registration failed. Try a different username.")
 
 
 def _login_user(username: str) -> None:
-    """Set session state and skip personalization if profile already exists."""
+    """Set session state. Profile check triggers personalization if needed."""
     st.session_state.authenticated = True
     st.session_state.username = username
     st.session_state.user_id = username.lower()
-
-    # Mark as last active for auto-login on refresh
-    set_last_active_user(username)
 
     profile = get_profile(username)
     if profile:
@@ -83,7 +110,7 @@ def _login_user(username: str) -> None:
     else:
         st.session_state.profile_completed = False
 
-    # Restore persisted chat session history so sidebar shows previous chats
+    # Restore chat sessions from SQLite
     saved_sessions = get_chat_sessions(username)
     if saved_sessions:
         st.session_state.chat_sessions = saved_sessions
@@ -123,7 +150,7 @@ def show_personalization_modal() -> None:
         st.markdown(
             "<div class='filmdb-profile-card'>"
             "<h2 style='text-align:center;margin-bottom:.2rem;'>🎬 Set Up Your Profile</h2>"
-            "<p class='subtitle' style='text-align:center;'>Tell us what you love so we can personalise your feed</p>"
+            "<p class='subtitle' style='text-align:center;'>Tell us what you love so we can personalise your experience</p>"
             "</div>",
             unsafe_allow_html=True,
         )
@@ -185,9 +212,7 @@ def show_personalization_modal() -> None:
                         "fav_actors": [a.strip() for a in fav_actors.split(",") if a.strip()],
                         "fav_directors": [d.strip() for d in fav_directors.split(",") if d.strip()],
                     }
-                    # ── persist to disk ──
                     save_profile(st.session_state.username, profile)
-
                     st.session_state.profile_completed = True
                     st.session_state.user_profile = profile
                     st.rerun()

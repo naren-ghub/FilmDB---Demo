@@ -109,9 +109,9 @@ async def run(title: str, year: str | int | None = None) -> dict:
             movie = results[0]
             movie_id = movie.get("id")
 
-            # Step 2: Get full details + credits in one go
+            # Step 2: Get full details + credits + videos in one go
             details = await _get(client, f"/movie/{movie_id}", {
-                "append_to_response": "credits",
+                "append_to_response": "credits,videos",
                 "language": "en-US",
             })
 
@@ -147,6 +147,14 @@ async def run(title: str, year: str | int | None = None) -> dict:
     poster_path = details.get("poster_path")
     poster_url = f"{_IMAGE_BASE}{poster_path}" if poster_path else None
 
+    # Trailer key (YouTube via TMDB videos)
+    videos = details.get("videos", {}).get("results", [])
+    trailer = next(
+        (v for v in videos if v.get("type") == "Trailer" and v.get("site") == "YouTube"),
+        None,
+    )
+    trailer_key = trailer.get("key") if trailer else None
+
     # Rating
     rating = details.get("vote_average")
     if rating is not None:
@@ -172,6 +180,7 @@ async def run(title: str, year: str | int | None = None) -> dict:
         "tagline": details.get("tagline") or "",
         "status": details.get("status"),
         "original_language": details.get("original_language"),
+        "trailer_key": trailer_key,
     }
     return normalize_tool_output("success", data)
 

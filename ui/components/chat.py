@@ -416,76 +416,241 @@ def _render_user_bubble(content: str) -> None:
 
 
 def _render_assistant_response(msg: dict) -> None:
-    """Deterministic rendering based on response_mode."""
+    """Deterministic rendering based on response_mode and entity_type."""
     mode = msg.get("response_mode", "EXPLANATION_ONLY")
     text = msg.get("text_response", msg.get("content", ""))
     poster = msg.get("poster_url", "")
+    entity_type = msg.get("entity_type", "")
     streaming = msg.get("streaming", [])
     recommendations = msg.get("recommendations", [])
     sources = msg.get("sources", [])
     download = msg.get("download_link", "")
+    genres = msg.get("genres", [])
+    awards = msg.get("awards", {})
+    trailer_key = msg.get("trailer_key", "")
 
-    # ── FULL_CARD: poster + metadata side-by-side ──
-    if mode == "FULL_CARD" and poster:
+    # ── PERSON CARD ────────────────────────────────────────────────────────────
+    if entity_type == "person" or mode in ("PERSON_LOOKUP", "FILMOGRAPHY"):
+        _render_person_card(msg)
+
+    # ── FULL MOVIE CARD (only for movie entities) ──────────────────────────────
+    elif mode == "FULL_CARD" and poster and entity_type != "person":
         title = msg.get("title", "Unknown Title")
         director = msg.get("director", "Unknown Director")
         year = msg.get("year", "")
-        rating = msg.get("rating", "N/A")
-        
-        platforms_str = ", ".join([s.get("name") if isinstance(s, dict) else str(s) for s in streaming]) if streaming else "Not available to stream"
-        
-        import textwrap
-        
-        hide_footer = mode in ("AVAILABILITY_FOCUS", "EXPLANATION_PLUS_AVAILABILITY") or not streaming
-        footer_line = ""
-        if not hide_footer:
-            footer_line = f'<div style="margin-top:15px; padding-top:10px; border-top: 1px solid #333; clear: both;"><b style="color:#c9a227;">Where to Watch:</b> {platforms_str}</div>'
-        
+        rating = msg.get("rating", "")
+        accent = _genre_accent(genres)
+        rating_html = _rating_gauge(rating)
+        badges_html = _award_badges(awards)
+
         html = f"""
-<div style="padding:18px; border-radius:12px; background-color:#111; border:1px solid #333; margin-bottom:20px; overflow: auto;">
-    <div style="float: left; margin: 0 20px 10px 0;">
-        <img src="{poster}" style="width:200px; border-radius:8px; display: block;">
+<div style="padding:18px; border-radius:12px; background:#111;
+     border:1px solid #333; border-left:4px solid {accent};
+     margin-bottom:20px; overflow:auto;">
+    <div style="float:left; margin:0 20px 10px 0;">
+        <img src="{poster}" style="width:200px; border-radius:8px; display:block;">
     </div>
-    <div style="color: white;">
-        <h2 style="margin-bottom:5px; margin-top:0;">{title}</h2>
-        <p style="color:#bbb;margin-top:0;">{director} • {year} • ⭐ {rating}</p>
-        <div style="line-height:1.6; font-size: 0.95rem;">
+    <div style="color:white;">
+        <h2 style="margin:0 0 5px;">{title}</h2>
+        <p style="color:#bbb;margin:0 0 4px;">{director} &bull; {year}</p>
+        {rating_html}
+        {badges_html}
+        <div style="line-height:1.6; font-size:0.95rem; margin-top:10px;">
             {md_to_html(text)}
         </div>
-        {footer_line}
     </div>
-</div>
-""".strip()
+</div>""".strip()
         st.markdown(html, unsafe_allow_html=True)
-    else:
-        # ── text bubble for all other modes ──
-        st.markdown(
-            f"<div class='filmdb-asst-msg'>{md_to_html(text)}</div>",
-            unsafe_allow_html=True,
-        )
 
-    # ── AVAILABILITY_FOCUS / EXPLANATION_PLUS_AVAILABILITY ──
-    if mode in ("AVAILABILITY_FOCUS", "EXPLANATION_PLUS_AVAILABILITY") and streaming:
+        # Trailer embed
+        if trailer_key:
+            st.markdown(
+                f'<div style="margin-top:12px; border-radius:8px; overflow:hidden;">'
+                f'<iframe width="100%" height="280" '
+                f'src="https://www.youtube.com/embed/{trailer_key}?rel=0" '
+                f'frameborder="0" allowfullscreen></iframe></div>',
+                unsafe_allow_html=True,
+            )
+
+        # Watchlist button
+        col_w, col_f, _ = st.columns([2, 2, 6])
+        with col_w:
+            if st.button("📌 Watchlist", key=f"wl_{title[:14]}", use_container_width=True):
+                _add_to_watchlist(title, msg.get("imdb_id", ""))
+        with col_f:
+            if st.button("❤️ Favourite", key=f"fav_{title[:14]}", use_container_width=True):
+                _add_to_watchlist(title, msg.get("imdb_id", ""), list_key="favorites")
+
+    # ── COMPARISON LAYOUT ──────────────────────────────────────────────────────
+    elif mode == "COMPARISON_TABLE":
+        _render_comparison(msg)
+
+    # ── DEFAULT TEXT BUBBLE (all other modes) ─────────────────────────────────
+    else:
+        _render_with_spoiler_guard(text, mode)
+
+    # ── STREAMING PLATFORMS (only for movie entities) ─────────────────────────
+    if entity_type != "person" and mode in ("AVAILABILITY_FOCUS", "EXPLANATION_PLUS_AVAILABILITY", "FULL_CARD") and streaming:
         _render_platforms(streaming)
 
-    # ── RECOMMENDATION_GRID ──
-    if mode == "RECOMMENDATION_GRID" and recommendations:
-        _render_recommendations(recommendations)
-    elif recommendations and mode not in ("CLARIFICATION",):
+    # ── RECOMMENDATIONS ────────────────────────────────────────────────────────
+    if recommendations and mode not in ("CLARIFICATION",):
         _render_recommendations(recommendations)
 
-    # ── Download link ──
+    # ── DOWNLOAD CARD ──────────────────────────────────────────────────────────
     if download:
-        st.markdown(
-            f"<a href='{download}' target='_blank' "
-            f"style='color:#c9a227;font-weight:600;font-size:0.9rem;'>"
-            f"⬇ Download from Internet Archive</a>",
-            unsafe_allow_html=True,
-        )
+        st.markdown(f"""
+<div style="background:#1a1a2e; border:1px solid rgba(201,162,39,.3);
+     border-radius:12px; padding:14px 18px; margin-top:10px;
+     display:flex; align-items:center; gap:12px;">
+    <span style="font-size:1.8rem;">📦</span>
+    <div style="flex:1;">
+        <div style="font-weight:600; font-size:0.9rem; color:#eaeaea;">Public Domain Download</div>
+        <div style="font-size:0.78rem; color:#6c6c80;">Internet Archive — Free &amp; Legal</div>
+    </div>
+    <a href="{download}" target="_blank" style="background:linear-gradient(135deg,#c9a227,#d4a017);
+       color:#0d0d0d; padding:8px 16px; border-radius:8px; font-weight:600;
+       font-size:0.85rem; text-decoration:none;">Download ⬇</a>
+</div>""", unsafe_allow_html=True)
 
-    # ── collapsible sources ──
+    # ── SOURCES ────────────────────────────────────────────────────────────────
     if sources:
         _render_sources(sources)
+
+
+# ═══════════════════════════════════════════════════════════════
+#  RICH CARD HELPERS
+# ═══════════════════════════════════════════════════════════════
+
+_GENRE_COLORS = {
+    "Horror": "#8b0000", "Thriller": "#4a0e0e", "Sci-Fi": "#1a237e",
+    "Science Fiction": "#1a237e", "Romance": "#880e4f", "Comedy": "#e65100",
+    "Drama": "#3e2723", "Animation": "#1b5e20", "Documentary": "#004d40",
+    "Action": "#bf360c", "Crime": "#311b92", "Fantasy": "#1a237e",
+}
+
+def _genre_accent(genres: list) -> str:
+    for g in genres:
+        if g in _GENRE_COLORS:
+            return _GENRE_COLORS[g]
+    return "#c9a227"  # default gold
+
+
+def _rating_gauge(rating) -> str:
+    if not rating:
+        return ""
+    try:
+        r = float(rating)
+    except (ValueError, TypeError):
+        return f"<p style='color:#bbb;font-size:0.9rem;'>⭐ {rating}</p>"
+    pct = (r / 10) * 100
+    color = "#4caf50" if r >= 7 else "#ff9800" if r >= 5 else "#f44336"
+    return f"""
+<div style="display:flex; align-items:center; gap:8px; margin:6px 0;">
+    <span style="font-weight:700; font-size:1.1rem; color:{color};">{r}</span>
+    <div style="width:110px; height:6px; background:#1a1a2e; border-radius:3px; overflow:hidden;">
+        <div style="width:{pct:.0f}%; height:100%; background:{color}; border-radius:3px;"></div>
+    </div>
+    <span style="font-size:0.7rem; color:#6c6c80;">/ 10 IMDb</span>
+</div>"""
+
+
+def _award_badges(awards: dict) -> str:
+    if not awards:
+        return ""
+    wins = awards.get("oscar_wins", [])
+    noms = awards.get("oscar_nominations", [])
+    html = ""
+    if wins:
+        html += (f'<span style="display:inline-block; background:linear-gradient(135deg,#c9a227,#d4a017);'
+                 f'color:#0d0d0d; font-size:0.75rem; font-weight:700; padding:3px 10px;'
+                 f'border-radius:50px; margin:2px;">🏆 {len(wins)} Oscar Win{"s" if len(wins)>1 else ""}</span>')
+    if noms:
+        html += (f'<span style="display:inline-block; background:#22223a;color:#c9a227;'
+                 f'font-size:0.75rem; font-weight:600; padding:3px 10px; border-radius:50px;'
+                 f'border:1px solid rgba(201,162,39,.4); margin:2px;">🎬 {len(noms)} Nomination{"s" if len(noms)>1 else ""}</span>')
+    return f"<div style='margin:6px 0;'>{html}</div>" if html else ""
+
+
+def _render_person_card(msg: dict) -> None:
+    name = msg.get("person_name") or msg.get("title") or "Unknown"
+    photo = msg.get("poster_url", "")
+    profession = msg.get("profession", "")
+    birth = msg.get("birth_date", "")
+    text = msg.get("text_response", msg.get("content", ""))
+    photo_html = (f"<img src='{photo}' style='width:160px; height:160px; object-fit:cover; border-radius:50%; border:3px solid #c9a227;'>"
+                  if photo else
+                  "<div style='width:160px; height:160px; border-radius:50%; background:#1a1a2e; display:flex; align-items:center; justify-content:center; font-size:3rem;'>🎬</div>")
+    meta = " &bull; ".join(filter(None, [profession, f"Born: {birth}" if birth else ""]))
+    st.markdown(f"""
+<div style="padding:18px; border-radius:12px; background:#111;
+     border:1px solid #333; border-left:4px solid #c9a227;
+     margin-bottom:20px; overflow:auto;">
+    <div style="float:left; margin:0 20px 10px 0; text-align:center;">
+        {photo_html}
+    </div>
+    <div style="color:white;">
+        <h2 style="margin:0 0 5px; color:#c9a227;">{name}</h2>
+        <p style="color:#a0a0b8; margin:0 0 10px; font-size:0.9rem;">{meta}</p>
+        <div style="line-height:1.6; font-size:0.95rem;">{md_to_html(text)}</div>
+    </div>
+</div>""", unsafe_allow_html=True)
+
+
+def _render_comparison(msg: dict) -> None:
+    movie_a = {"title": msg.get("title", "Film A"), "poster_url": msg.get("poster_url", ""), "year": msg.get("year", ""), "rating": msg.get("rating", "")}
+    text = msg.get("text_response", msg.get("content", ""))
+    col_a, col_vs, col_b = st.columns([5, 1, 5])
+    with col_a:
+        _render_comparison_half(movie_a)
+    with col_vs:
+        st.markdown("<div style='display:flex;align-items:center;justify-content:center;height:100%;font-size:1.4rem;color:#c9a227;font-weight:800;padding-top:60px;'>VS</div>", unsafe_allow_html=True)
+    with col_b:
+        st.markdown("<div style='padding:12px;background:#1a1a2e;border-radius:12px;border:1px solid #333;text-align:center;color:#a0a0b8;font-size:0.85rem;'>Film B data available in next response</div>", unsafe_allow_html=True)
+    _render_with_spoiler_guard(text, "COMPARISON_TABLE")
+
+
+def _render_comparison_half(movie: dict) -> None:
+    poster = movie.get("poster_url", "")
+    title = movie.get("title", "")
+    year = movie.get("year", "")
+    rating = movie.get("rating", "")
+    st.markdown(f"""
+<div style="text-align:center; padding:12px; background:#1a1a2e;
+     border-radius:12px; border:1px solid #333;">
+    {'<img src="' + poster + '" style="width:150px; border-radius:8px; margin-bottom:8px;">' if poster else ''}
+    <div style="font-weight:700; color:#c9a227; margin-bottom:4px;">{title}</div>
+    <div style="font-size:0.85rem; color:#a0a0b8;">{year} &bull; ⭐ {rating}</div>
+</div>""", unsafe_allow_html=True)
+
+
+def _render_with_spoiler_guard(text: str, mode: str) -> None:
+    spoiler_modes = ("PLOT_EXPLANATION", "ANALYSIS_TEXT", "CRITIC_REVIEW")
+    if mode in spoiler_modes and ("**SPOILER**" in text or "[SPOILER]" in text):
+        marker = "**SPOILER**" if "**SPOILER**" in text else "[SPOILER]"
+        parts = text.split(marker, 1)
+        st.markdown(f"<div class='filmdb-asst-msg'>{md_to_html(parts[0])}</div>", unsafe_allow_html=True)
+        with st.expander("⚠️ Contains Spoilers — Click to reveal", expanded=False):
+            st.markdown(md_to_html(parts[1] if len(parts) > 1 else ""), unsafe_allow_html=True)
+    else:
+        st.markdown(f"<div class='filmdb-asst-msg'>{md_to_html(text)}</div>", unsafe_allow_html=True)
+
+
+def _add_to_watchlist(title: str, imdb_id: str, list_key: str = "watchlist") -> None:
+    import datetime as dt
+    profile = st.session_state.get("user_profile", {})
+    lst = profile.get(list_key, [])
+    entry = {"title": title, "imdb_id": imdb_id, "added_at": str(dt.date.today())}
+    if not any(i.get("title") == title for i in lst):
+        lst.append(entry)
+        profile[list_key] = lst
+        st.session_state.user_profile = profile
+        from utils.persistence import save_profile
+        save_profile(st.session_state.get("username", ""), profile)
+        st.toast(f"{'📌 Added to Watchlist' if list_key == 'watchlist' else '❤️ Added to Favourites'}: {title}")
+    else:
+        st.toast(f"Already in your {list_key.replace('_',' ').title()}!")
+
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -506,28 +671,39 @@ def _render_platforms(streaming: list) -> None:
 
 
 def _render_recommendations(recs: list) -> None:
-    st.markdown("### Recommended Movies")
-    cols = st.columns(min(len(recs), 3), gap="small")
-    for i, rec in enumerate(recs[:6]):
-        with cols[i % 3]:
-            if isinstance(rec, dict):
-                title = rec.get("title", "Unknown")
-                poster = rec.get("poster_url", "")
-                st.markdown(f"<div class='filmdb-rec-card'>", unsafe_allow_html=True)
-                if poster:
-                    st.image(poster, use_container_width=True)
-                st.markdown(
-                    f"<div class='filmdb-rec-title'>{title}</div></div>",
-                    unsafe_allow_html=True,
-                )
-                if st.button(f"Ask about {title}", key=f"rec_{i}_{title[:12]}"):
-                    _inject_user_message(f"Tell me about {title}")
-            else:
-                st.markdown(
-                    f"<div class='filmdb-rec-card'>"
-                    f"<div class='filmdb-rec-title'>{rec}</div></div>",
-                    unsafe_allow_html=True,
-                )
+    if not recs:
+        return
+    # Check if recs are dicts with poster_url → use carousel, else use simple list
+    has_posters = any(isinstance(r, dict) and r.get("poster_url") for r in recs)
+    if has_posters:
+        _render_poster_carousel(recs, label="Recommended Films")
+        return
+    # String or dict without poster
+    st.markdown("**🎬 Recommendations**")
+    for rec in recs[:8]:
+        title = rec.get("title", str(rec)) if isinstance(rec, dict) else str(rec)
+        if st.button(f"▶  {title}", key=f"rec_{title[:20]}"):
+            _inject_user_message(f"Tell me about {title}")
+
+
+def _render_poster_carousel(items: list, label: str = "Recommended") -> None:
+    cards_html = ""
+    for item in items[:12]:
+        title = item.get("title", "") if isinstance(item, dict) else str(item)
+        poster = item.get("poster_url", "") if isinstance(item, dict) else ""
+        cards_html += f"""
+        <div style="min-width:130px; max-width:130px; flex-shrink:0; text-align:center;">
+            {'<img src="' + poster + '" style="width:120px; height:180px; object-fit:cover; border-radius:8px; border:1px solid #333;">' if poster else '<div style="width:120px; height:180px; background:#1a1a2e; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:2rem; border:1px solid #333;">🎬</div>'}
+            <div style="font-size:0.77rem; margin-top:5px; color:#eaeaea; font-weight:500; word-break:break-word;">{title}</div>
+        </div>"""
+    st.markdown(f"""
+<div style="margin:12px 0;">
+    <div style="font-size:0.85rem; color:#a0a0b8; font-weight:600; margin-bottom:8px;">{label}</div>
+    <div style="display:flex; gap:12px; overflow-x:auto; padding-bottom:8px;
+         scrollbar-width:thin; scrollbar-color:#333 transparent;">
+        {cards_html}
+    </div>
+</div>""", unsafe_allow_html=True)
 
 
 def _render_sources(sources: list) -> None:

@@ -20,6 +20,7 @@ from app.db.session_store import (
     get_or_create_user,
     get_session_context,
     get_user_profile,
+    log_request,
     store_message,
     store_tool_call,
     upsert_session_context,
@@ -107,6 +108,7 @@ class ConversationEngine:
             "session_id": session_id,
             "user_id": user_id,
             "message": message,
+            "_start_time": time.time(),
         }
         try:
             get_or_create_user(db, user_id)
@@ -765,6 +767,14 @@ class ConversationEngine:
             "year": "",
             "director": "",
             "rating": "",
+            # ── New enriched fields ──
+            "entity_type": "",       # "movie" | "person"
+            "person_name": "",
+            "profession": "",
+            "birth_date": "",
+            "genres": [],
+            "trailer_key": "",
+            "awards": {},
         }
         # Data from IMDb/TMDB API
         imdb = tool_outputs.get("imdb")
@@ -779,10 +789,15 @@ class ConversationEngine:
         tmdb_out = tool_outputs.get("tmdb")
         if tmdb_out and tmdb_out.get("status") == "success":
             data = tmdb_out.get("data", {})
-            if "name" in data: # Person Data
+            if "name" in data:  # Person data
+                response["entity_type"] = "person"
+                response["person_name"] = data.get("name", "")
+                response["profession"] = data.get("profession", "")
+                response["birth_date"] = data.get("birth_date", "")
                 if not response["poster_url"]:
                     response["poster_url"] = data.get("poster_url", "")
-            else: # Movie Data
+            else:  # Movie data
+                response["entity_type"] = "movie"
                 if not response["poster_url"]:
                     response["poster_url"] = data.get("poster_url", "")
                 if not response["title"]:
@@ -793,6 +808,10 @@ class ConversationEngine:
                     response["rating"] = data.get("rating", "")
                 if not response["director"]:
                     response["director"] = data.get("director", "")
+                if not response["genres"]:
+                    response["genres"] = data.get("genres", [])
+                if not response["trailer_key"]:
+                    response["trailer_key"] = data.get("trailer_key", "")
         # Data from KB entity
         kb_entity = tool_outputs.get("kb_entity")
         if kb_entity and kb_entity.get("status") == "success":
@@ -809,6 +828,11 @@ class ConversationEngine:
                 response["rating"] = data.get("imdb_rating", "")
             if not response["director"]:
                 response["director"] = data.get("director", "")
+            if not response["genres"]:
+                raw_genres = data.get("genres", "")
+                response["genres"] = [g.strip() for g in raw_genres.split(",") if g.strip()] if isinstance(raw_genres, str) else raw_genres or []
+            if not response["entity_type"]:
+                response["entity_type"] = "movie"
         imdb_person = tool_outputs.get("imdb_person")
         if imdb_person and imdb_person.get("status") == "success":
             response["poster_url"] = (
@@ -847,16 +871,25 @@ class ConversationEngine:
         if cinema_search and cinema_search.get("status") == "success":
             results = cinema_search.get("data", {}).get("results", [])
             response["sources"] = [{"title": r.get("title"), "url": r.get("url")} for r in results]
+        # Awards from KB
+        kb_awards = tool_outputs.get("kb_awards")
+        if kb_awards and kb_awards.get("status") == "success":
+            awards_data = kb_awards.get("data", {})
+            response["awards"] = {
+                "oscar_wins": awards_data.get("wins", []),
+                "oscar_nominations": awards_data.get("nominations", []),
+            }
         return response
 
     def _profile_to_dict(self, profile) -> Dict[str, Any]:
         return {
             "region": getattr(profile, "region", None),
-            "preferred_language": getattr(profile, "preferred_language", None),
-            "subscribed_platforms": getattr(profile, "subscribed_platforms", None),
-            "favorite_genres": getattr(profile, "favorite_genres", None),
-            "favorite_movies": getattr(profile, "favorite_movies", None),
-            "response_style": getattr(profile, "response_style", None),
+            # Aligned with frontend personalization form field names
+            "platforms": getattr(profile, "platforms", None),
+            "genres": getattr(profile, "genres", None),
+            "fav_movies": getattr(profile, "fav_movies", None),
+            "fav_actors": getattr(profile, "fav_actors", None),
+            "fav_directors": getattr(profile, "fav_directors", None),
         }
 
     # ─── LLM Report Writer ────────────────────────────────────────────────
@@ -998,6 +1031,13 @@ class ConversationEngine:
             self.logger.info("LLM report appended to %s", self._REPORT_PATH)
         except Exception:
             self.logger.exception("Failed to write LLM report")
+
+        # Also persist the full trace to SQLite for admin review
+        try:
+            elapsed_ms = int((time.time() - trace.get("_start_time", time.time())) * 1000)
+            log_request(trace, response, total_time_ms=elapsed_ms)
+        except Exception:
+            self.logger.exception("Failed to write RequestLog")
 
     def _update_caches(self, outputs: Dict[str, Dict]) -> None:
         db = SessionLocal()

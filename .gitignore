@@ -54,3 +54,5 @@ rag/data/
 production_crawler_log.txt
 crawler_test_log.txt
 production_crawl_log.txt
+all_books_list.json
+audit_sorted.json
