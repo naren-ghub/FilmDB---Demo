@@ -8,7 +8,7 @@ Layers used:
     - movie_entity.parquet        → entity lookup, top rated, resolve title
     - metadata_layer.parquet      → TMDB enrichment (overview, poster, etc.)
     - plot_layer.parquet           → Wikipedia plot text
-    - review_layer.parquet         → Rotten Tomatoes critic reviews
+
     - recommendation_layer.parquet → MovieLens tags/ratings (similarity)
     - regional_layer.parquet       → Indian cinema metadata
     - person_index.parquet         → Person filmography index
@@ -40,9 +40,8 @@ class FilmDBQueryEngine:
         self._movie_entity = self._load("movie_entity.parquet")
         self._metadata = self._load("metadata_layer.parquet")
         self._plots = self._load("plot_layer.parquet")
-        self._reviews = self._load("review_layer.parquet")
+
         self._recommendations = self._load("recommendation_layer.parquet")
-        self._regional = self._load("regional_layer.parquet")
         self._persons = self._load("person_index.parquet")
         self._streaming = self._load("streaming_layer.parquet")
         self._oscars = self._load("oscar_layer.parquet")
@@ -117,11 +116,10 @@ class FilmDBQueryEngine:
             self._person_name_index = dict(zip(names_lower, valid["nconst"]))
 
         log.info(
-            "FilmDBQueryEngine: ready — %s movies, %s persons, %s plots, %s reviews, %s analysis",
+            "FilmDBQueryEngine: ready — %s movies, %s persons, %s plots, %s analysis",
             f"{len(self._movie_entity):,}" if self._movie_entity is not None else "0",
             f"{len(self._persons):,}" if self._persons is not None else "0",
             f"{len(self._plots):,}" if self._plots is not None else "0",
-            f"{len(self._reviews):,}" if self._reviews is not None else "0",
             f"{len(self._analysis):,}",
         )
 
@@ -182,6 +180,19 @@ class FilmDBQueryEngine:
 
         return None
 
+    def get_movie_year(self, imdb_id: str) -> int | None:
+        """Fetch the release year for a given IMDb ID."""
+        if self._movie_entity is None:
+            return None
+        row = self._movie_entity[self._movie_entity["imdb_id"] == imdb_id]
+        if row.empty:
+            return None
+        year_val = row.iloc[0].get("year")
+        try:
+            return int(year_val) if year_val and str(year_val).isdigit() else None
+        except (ValueError, TypeError):
+            return None
+
     # ─── Entity Lookup ───────────────────────────────────────────────────────
 
     def entity_lookup(self, imdb_id: str) -> dict[str, Any] | None:
@@ -212,14 +223,6 @@ class FilmDBQueryEngine:
                 movie["historical_box_office_rank"] = meta.get("historical_box_office_rank")
                 movie["historical_worldwide_gross"] = meta.get("historical_worldwide_gross")
                 movie["studio"] = meta.get("studio")
-
-        # Enrich with regional data
-        if self._regional is not None:
-            reg_row = self._regional[self._regional["imdb_id"] == imdb_id]
-            if not reg_row.empty:
-                reg = reg_row.iloc[0].to_dict()
-                movie["language"] = reg.get("language")
-                movie["region"] = reg.get("region")
 
         # Clean NaN values
         return {k: (None if pd.isna(v) else v) for k, v in movie.items()}
@@ -310,41 +313,6 @@ class FilmDBQueryEngine:
         r = row.iloc[0].to_dict()
         return {k: (None if pd.isna(v) else v) for k, v in r.items()}
 
-    # ─── Critic Summary ──────────────────────────────────────────────────────
-
-    def critic_summary(self, imdb_id: str, max_reviews: int = 30) -> dict[str, Any] | None:
-        """Aggregate Rotten Tomatoes reviews for a movie."""
-        if self._reviews is None:
-            return None
-
-        reviews = self._reviews[self._reviews["imdb_id"] == imdb_id]
-        if reviews.empty:
-            return None
-
-        # Prioritize top critics
-        top_reviews = reviews[reviews["is_top_critic"] == "TRUE"]
-        other_reviews = reviews[reviews["is_top_critic"] != "TRUE"]
-        selected = pd.concat([top_reviews, other_reviews]).head(max_reviews)
-
-        # Compute sentiment breakdown
-        sentiments = reviews["sentiment"].value_counts().to_dict()
-
-        review_list = []
-        for _, r in selected.iterrows():
-            review_list.append({
-                "critic_name": r.get("critic_name"),
-                "review_text": r.get("review_text"),
-                "sentiment": r.get("sentiment"),
-                "score": r.get("score"),
-                "is_top_critic": r.get("is_top_critic"),
-            })
-
-        return {
-            "imdb_id": imdb_id,
-            "review_count": len(reviews),
-            "sentiment_breakdown": sentiments,
-            "reviews": review_list,
-        }
 
     # ─── Movie Similarity ────────────────────────────────────────────────────
 
@@ -480,13 +448,10 @@ class FilmDBQueryEngine:
         if year:
             df = df[df["year"] == str(year)]
 
-        if language and self._regional is not None:
-            # Use regional_layer for language filtering
+        if language:
             lang_lower = language.lower()
-            regional_ids = self._regional[
-                self._regional["language"].str.lower() == lang_lower
-            ]["imdb_id"]
-            df = df[df["imdb_id"].isin(set(regional_ids))]
+            if "language" in df.columns:
+                df = df[df["language"].str.lower() == lang_lower]
 
         # Sort by rating descending, then by votes descending
         df["_rating_f"] = pd.to_numeric(df["imdb_rating"], errors="coerce")
@@ -623,23 +588,11 @@ class FilmDBQueryEngine:
             plot_a = self.plot_analysis(imdb_id_a)
             if plot_a:
                 result["movie_a"]["plot_text"] = plot_a.get("plot_text")
-            critic_a = self.critic_summary(imdb_id_a, max_reviews=5)
-            if critic_a:
-                result["movie_a"]["review_summary"] = {
-                    "review_count": critic_a["review_count"],
-                    "sentiment_breakdown": critic_a["sentiment_breakdown"],
-                }
         if movie_b:
             result["movie_b"] = movie_b
             plot_b = self.plot_analysis(imdb_id_b)
             if plot_b:
                 result["movie_b"]["plot_text"] = plot_b.get("plot_text")
-            critic_b = self.critic_summary(imdb_id_b, max_reviews=5)
-            if critic_b:
-                result["movie_b"]["review_summary"] = {
-                    "review_count": critic_b["review_count"],
-                    "sentiment_breakdown": critic_b["sentiment_breakdown"],
-                }
 
         return result
 

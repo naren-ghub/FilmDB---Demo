@@ -3,9 +3,8 @@ from typing import Any
 
 
 def should_block(intent: dict[str, Any], message: str, has_context: bool) -> tuple[bool, str]:
-    # Block illegal download requests
-    if intent.get("primary_intent") == "ILLEGAL_DOWNLOAD_REQUEST":
-        return True, "I can't help with illegal downloads. I can help find legal streaming options."
+    # Deprecated: Illegal download requests are now routed to archive search first
+    # to find legal public domain alternatives.
 
     # Block pronoun-only queries that lack session context
     if _is_pronoun_only(message) and not has_context:

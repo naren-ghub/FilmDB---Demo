@@ -64,6 +64,15 @@ def render_sidebar() -> None:
 
         # ── chat history (always visible) ──
         _render_chat_history()
+        
+        st.markdown("---")
+        _render_favourites()
+        
+        st.markdown("---")
+        _render_watchlist()
+        
+        st.markdown("---")
+        _render_recycle_bin()
 
         st.markdown("---")
 
@@ -196,6 +205,112 @@ def _render_chat_history() -> None:
                         st.rerun()
 
 
+def _render_favourites() -> None:
+    st.markdown(
+        "<p style='font-size:0.72rem;text-transform:uppercase;"
+        "letter-spacing:0.08em;color:#6c6c80;font-weight:600;"
+        "margin:0.6rem 0 0.3rem;'>❤️ Favourites</p>",
+        unsafe_allow_html=True,
+    )
+    profile = st.session_state.get("user_profile", {})
+    favorites = profile.get("favorites", [])
+    
+    if not favorites:
+        st.markdown(
+            "<p style='font-size:0.8rem;color:#6c6c80;font-style:italic;"
+            "margin:0.3rem 0;'>No Favourites</p>",
+            unsafe_allow_html=True,
+        )
+        return
+        
+    fav_container = st.container(height=min(250, len(favorites) * 45 + 20), border=False)
+    with fav_container:
+        for idx, fav in enumerate(favorites):
+            title = fav.get("title", "Unknown")
+            imdb_id = fav.get("imdb_id", "")
+            
+            col1, col2 = st.columns([8, 2])
+            with col1:
+                st.markdown(f"<div style='font-size:0.85rem; padding:4px 0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;' title='{title}'>{title}</div>", unsafe_allow_html=True)
+            with col2:
+                if st.button("❌", key=f"del_fav_{idx}", help="Remove"):
+                    favorites.pop(idx)
+                    profile["favorites"] = favorites
+                    st.session_state.user_profile = profile
+                    from utils.persistence import save_profile
+                    save_profile(st.session_state.get("username", ""), profile)
+                    st.rerun()
+
+def _render_watchlist() -> None:
+    st.markdown(
+        "<p style='font-size:0.72rem;text-transform:uppercase;"
+        "letter-spacing:0.08em;color:#6c6c80;font-weight:600;"
+        "margin:0.6rem 0 0.3rem;'>📌 Watchlist</p>",
+        unsafe_allow_html=True,
+    )
+    profile = st.session_state.get("user_profile", {})
+    watchlist = profile.get("watchlist", [])
+    
+    if not watchlist:
+        st.markdown(
+            "<p style='font-size:0.8rem;color:#6c6c80;font-style:italic;"
+            "margin:0.3rem 0;'>Overview Empty</p>",
+            unsafe_allow_html=True,
+        )
+        return
+        
+    wl_container = st.container(height=min(250, len(watchlist) * 45 + 20), border=False)
+    with wl_container:
+        for idx, item in enumerate(watchlist):
+            title = item.get("title", "Unknown")
+            imdb_id = item.get("imdb_id", "")
+            
+            col1, col2 = st.columns([8, 2])
+            with col1:
+                st.markdown(f"<div style='font-size:0.85rem; padding:4px 0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;' title='{title}'>{title}</div>", unsafe_allow_html=True)
+            with col2:
+                if st.button("❌", key=f"del_wl_{idx}", help="Remove"):
+                    watchlist.pop(idx)
+                    profile["watchlist"] = watchlist
+                    st.session_state.user_profile = profile
+                    from utils.persistence import save_profile
+                    save_profile(st.session_state.get("username", ""), profile)
+                    st.rerun()
+
+
+def _render_recycle_bin() -> None:
+    st.markdown(
+        "<p style='font-size:0.72rem;text-transform:uppercase;"
+        "letter-spacing:0.08em;color:#6c6c80;font-weight:600;"
+        "margin:0.6rem 0 0.3rem;'>♻️ Recycle Bin</p>",
+        unsafe_allow_html=True,
+    )
+    from utils.persistence import get_deleted_chat_sessions
+    from utils.state import restore_deleted_session
+    deleted_sessions = get_deleted_chat_sessions(st.session_state.get("username", ""))
+    
+    if not deleted_sessions:
+        st.markdown(
+            "<p style='font-size:0.8rem;color:#6c6c80;font-style:italic;"
+            "margin:0.3rem 0;'>Bin is empty</p>",
+            unsafe_allow_html=True,
+        )
+        return
+        
+    del_container = st.container(height=min(250, len(deleted_sessions) * 45 + 20), border=False)
+    with del_container:
+        for sid, meta in deleted_sessions.items():
+            title = meta.get("title", "Untitled")
+            
+            col1, col2 = st.columns([8, 2])
+            with col1:
+                st.markdown(f"<div style='font-size:0.85rem; padding:4px 0; color:#c6c6c6; text-decoration:line-through; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;' title='{title}'>{title}</div>", unsafe_allow_html=True)
+            with col2:
+                if st.button("⤴️", key=f"restore_{sid}", help="Restore chat"):
+                    restore_deleted_session(sid)
+                    st.rerun()
+
+
 # ═══════════════════════════════════════════════════════════════
 #  MAIN CHAT INTERFACE
 # ═══════════════════════════════════════════════════════════════
@@ -219,15 +334,15 @@ def render_chat_interface() -> None:
             _render_kebab_menu()
 
     # ── starter cards (only when chat is empty) ──
-    if not st.session_state.messages:
-        _render_starter_cards()
+    # if not st.session_state.messages:
+    #     _render_starter_cards()
 
     # ── message history ──
-    for msg in st.session_state.messages:
+    for i, msg in enumerate(st.session_state.messages):
         if msg.get("role") == "user":
             _render_user_bubble(msg["content"])
         else:
-            _render_assistant_response(msg)
+            _render_assistant_response(msg, i)
 
     # ── process pending request ──
     if st.session_state.get("processing"):
@@ -391,16 +506,27 @@ def _render_starter_cards() -> None:
         unsafe_allow_html=True,
     )
 
-    st.markdown(
-        "<div style='display:flex;flex-wrap:wrap;justify-content:center;gap:0.6rem;margin-bottom:1.5rem;'>"
-        + "".join(
-            f"<span style='background:#1a1a2e;border:1px solid rgba(255,255,255,0.06);"
-            f"border-radius:20px;padding:0.45rem 1rem;font-size:0.82rem;color:#a0a0b8;'>{s}</span>"
-            for s in suggestions
-        )
-        + "</div>",
-        unsafe_allow_html=True,
-    )
+    st.markdown("<div class='filmdb-starter-hook'></div>", unsafe_allow_html=True)
+    cols = st.columns(2)
+    for i, s in enumerate(suggestions):
+        import re
+        # Clean HTML from the suggestion string
+        clean_text = re.sub(r'<[^>]+>', '', s).replace("&nbsp;", " ").strip()
+        # Create a visually pleasing subtext based on the icon/type
+        if "🎬" in clean_text: sub = "EXPLORE"
+        elif "📺" in clean_text: sub = "STREAMING"
+        elif "🎭" in clean_text: sub = "BIOGRAPHY"
+        elif "🏆" in clean_text: sub = "AWARDS"
+        elif "🔥" in clean_text: sub = "TRENDING"
+        elif "💬" in clean_text: sub = "CONTINUE"
+        else: sub = "DISCOVER"
+        
+        with cols[i % 2]:
+            if st.button(f"{clean_text}\n\n{sub}", key=f"starter_{i}"):
+                query = clean_text.split("  ", 1)[-1].strip() if "  " in clean_text else clean_text
+                # Remove emojis for exact query
+                query = re.sub(r'[^\w\s\?,\.\']', '', query).strip()
+                _inject_user_message(query)
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -415,7 +541,7 @@ def _render_user_bubble(content: str) -> None:
     )
 
 
-def _render_assistant_response(msg: dict) -> None:
+def _render_assistant_response(msg: dict, idx: int = 0) -> None:
     """Deterministic rendering based on response_mode and entity_type."""
     mode = msg.get("response_mode", "EXPLANATION_ONLY")
     text = msg.get("text_response", msg.get("content", ""))
@@ -444,20 +570,19 @@ def _render_assistant_response(msg: dict) -> None:
         badges_html = _award_badges(awards)
 
         html = f"""
-<div style="padding:18px; border-radius:12px; background:#111;
-     border:1px solid #333; border-left:4px solid {accent};
-     margin-bottom:20px; overflow:auto;">
+<div class="filmdb-glass-card filmdb-stagger-item" style="padding:18px; border-radius:12px;
+     border-left:4px solid {accent}; margin-bottom:20px; overflow:auto;">
     <div style="float:left; margin:0 20px 10px 0;">
         <img src="{poster}" style="width:200px; border-radius:8px; display:block;">
     </div>
     <div style="color:white;">
         <h2 style="margin:0 0 5px;">{title}</h2>
         <p style="color:#bbb;margin:0 0 4px;">{director} &bull; {year}</p>
-        {rating_html}
-        {badges_html}
-        <div style="line-height:1.6; font-size:0.95rem; margin-top:10px;">
-            {md_to_html(text)}
-        </div>
+{rating_html}
+{badges_html}
+<div style="line-height:1.6; font-size:0.95rem; margin-top:10px;">
+{md_to_html(text)}
+</div>
     </div>
 </div>""".strip()
         st.markdown(html, unsafe_allow_html=True)
@@ -475,10 +600,10 @@ def _render_assistant_response(msg: dict) -> None:
         # Watchlist button
         col_w, col_f, _ = st.columns([2, 2, 6])
         with col_w:
-            if st.button("📌 Watchlist", key=f"wl_{title[:14]}", use_container_width=True):
+            if st.button("📌 Watchlist", key=f"wl_{title[:14]}_{idx}", use_container_width=True):
                 _add_to_watchlist(title, msg.get("imdb_id", ""))
         with col_f:
-            if st.button("❤️ Favourite", key=f"fav_{title[:14]}", use_container_width=True):
+            if st.button("❤️ Favourite", key=f"fav_{title[:14]}_{idx}", use_container_width=True):
                 _add_to_watchlist(title, msg.get("imdb_id", ""), list_key="favorites")
 
     # ── COMPARISON LAYOUT ──────────────────────────────────────────────────────
@@ -500,17 +625,13 @@ def _render_assistant_response(msg: dict) -> None:
     # ── DOWNLOAD CARD ──────────────────────────────────────────────────────────
     if download:
         st.markdown(f"""
-<div style="background:#1a1a2e; border:1px solid rgba(201,162,39,.3);
-     border-radius:12px; padding:14px 18px; margin-top:10px;
-     display:flex; align-items:center; gap:12px;">
+<div class="filmdb-download-card filmdb-stagger-item">
     <span style="font-size:1.8rem;">📦</span>
     <div style="flex:1;">
         <div style="font-weight:600; font-size:0.9rem; color:#eaeaea;">Public Domain Download</div>
         <div style="font-size:0.78rem; color:#6c6c80;">Internet Archive — Free &amp; Legal</div>
     </div>
-    <a href="{download}" target="_blank" style="background:linear-gradient(135deg,#c9a227,#d4a017);
-       color:#0d0d0d; padding:8px 16px; border-radius:8px; font-weight:600;
-       font-size:0.85rem; text-decoration:none;">Download ⬇</a>
+    <a href="{download}" target="_blank" class="filmdb-download-btn">Download ↓</a>
 </div>""", unsafe_allow_html=True)
 
     # ── SOURCES ────────────────────────────────────────────────────────────────
@@ -545,8 +666,7 @@ def _rating_gauge(rating) -> str:
         return f"<p style='color:#bbb;font-size:0.9rem;'>⭐ {rating}</p>"
     pct = (r / 10) * 100
     color = "#4caf50" if r >= 7 else "#ff9800" if r >= 5 else "#f44336"
-    return f"""
-<div style="display:flex; align-items:center; gap:8px; margin:6px 0;">
+    return f"""<div style="display:flex; align-items:center; gap:8px; margin:6px 0;">
     <span style="font-weight:700; font-size:1.1rem; color:{color};">{r}</span>
     <div style="width:110px; height:6px; background:#1a1a2e; border-radius:3px; overflow:hidden;">
         <div style="width:{pct:.0f}%; height:100%; background:{color}; border-radius:3px;"></div>
@@ -583,16 +703,17 @@ def _render_person_card(msg: dict) -> None:
                   "<div style='width:160px; height:160px; border-radius:50%; background:#1a1a2e; display:flex; align-items:center; justify-content:center; font-size:3rem;'>🎬</div>")
     meta = " &bull; ".join(filter(None, [profession, f"Born: {birth}" if birth else ""]))
     st.markdown(f"""
-<div style="padding:18px; border-radius:12px; background:#111;
-     border:1px solid #333; border-left:4px solid #c9a227;
-     margin-bottom:20px; overflow:auto;">
+<div class="filmdb-glass-card filmdb-stagger-item" style="padding:18px; border-radius:12px;
+     border-left:4px solid #c9a227; margin-bottom:20px; overflow:auto;">
     <div style="float:left; margin:0 20px 10px 0; text-align:center;">
         {photo_html}
     </div>
     <div style="color:white;">
         <h2 style="margin:0 0 5px; color:#c9a227;">{name}</h2>
         <p style="color:#a0a0b8; margin:0 0 10px; font-size:0.9rem;">{meta}</p>
-        <div style="line-height:1.6; font-size:0.95rem;">{md_to_html(text)}</div>
+<div style="line-height:1.6; font-size:0.95rem;">
+{md_to_html(text)}
+</div>
     </div>
 </div>""", unsafe_allow_html=True)
 
@@ -688,19 +809,29 @@ def _render_recommendations(recs: list) -> None:
 
 def _render_poster_carousel(items: list, label: str = "Recommended") -> None:
     cards_html = ""
-    for item in items[:12]:
+    for i, item in enumerate(items[:12]):
         title = item.get("title", "") if isinstance(item, dict) else str(item)
         poster = item.get("poster_url", "") if isinstance(item, dict) else ""
+        year = item.get("year", "") if isinstance(item, dict) else ""
+        rating = item.get("rating", "") if isinstance(item, dict) else ""
+        genres = item.get("genres", []) if isinstance(item, dict) else []
+        genre_tag = str(genres[0]) if isinstance(genres, list) and genres else (genres.split(",")[0].strip() if isinstance(genres, str) else "")
+
+        poster_img = f'<img src="{poster}">' if poster else '<div style="width:100%;height:195px;background:#1a1a2e;display:flex;align-items:center;justify-content:center;font-size:2.2rem;">🎬</div>'
+        meta = " • ".join([str(x) for x in (year, f"⭐ {rating}" if rating else "", genre_tag) if x])
+        
         cards_html += f"""
-        <div style="min-width:130px; max-width:130px; flex-shrink:0; text-align:center;">
-            {'<img src="' + poster + '" style="width:120px; height:180px; object-fit:cover; border-radius:8px; border:1px solid #333;">' if poster else '<div style="width:120px; height:180px; background:#1a1a2e; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:2rem; border:1px solid #333;">🎬</div>'}
-            <div style="font-size:0.77rem; margin-top:5px; color:#eaeaea; font-weight:500; word-break:break-word;">{title}</div>
+        <div class="filmdb-carousel-item">
+            {poster_img}
+            <div class="filmdb-carousel-meta">
+                <div class="filmdb-carousel-title">{title}</div>
+                <div class="filmdb-carousel-sub">{meta}</div>
+            </div>
         </div>"""
     st.markdown(f"""
 <div style="margin:12px 0;">
     <div style="font-size:0.85rem; color:#a0a0b8; font-weight:600; margin-bottom:8px;">{label}</div>
-    <div style="display:flex; gap:12px; overflow-x:auto; padding-bottom:8px;
-         scrollbar-width:thin; scrollbar-color:#333 transparent;">
+    <div class="filmdb-carousel">
         {cards_html}
     </div>
 </div>""", unsafe_allow_html=True)
@@ -740,12 +871,23 @@ def _process_pending_message() -> None:
     if not last_user_msg:
         return
 
-    with st.spinner("Fetching cinematic intelligence…"):
-        resp = send_chat_message(
-            session_id=st.session_state.session_id,
-            user_id=st.session_state.user_id,
-            message=last_user_msg,
-        )
+    placeholder = st.empty()
+    placeholder.markdown("""
+<div class="filmdb-skeleton">
+    <div class="filmdb-skeleton-avatar"></div>
+    <div class="filmdb-skeleton-content">
+        <div class="filmdb-skeleton-bar"></div>
+        <div class="filmdb-skeleton-bar"></div>
+        <div class="filmdb-skeleton-bar"></div>
+    </div>
+</div>""", unsafe_allow_html=True)
+    
+    resp = send_chat_message(
+        session_id=st.session_state.session_id,
+        user_id=st.session_state.user_id,
+        message=last_user_msg,
+    )
+    placeholder.empty()
 
     resp["role"] = "assistant"
     st.session_state.messages.append(resp)

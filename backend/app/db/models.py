@@ -45,11 +45,13 @@ class UserProfile(Base):
     fav_movies = Column(JSON)      # formerly favorite_movies
     fav_actors = Column(JSON)      # NEW — collected by frontend but previously ignored
     fav_directors = Column(JSON)   # NEW — collected by frontend but previously ignored
+    watchlist = Column(JSON)       # NEW
+    favorites = Column(JSON)       # NEW
     created_at = Column(DateTime, default=_now)
     updated_at = Column(DateTime, default=_now)
 
 
-class Session(Base):
+class ChatSession(Base):
     __tablename__ = "sessions"
 
     id = Column(String, primary_key=True, default=_uuid)
@@ -57,13 +59,14 @@ class Session(Base):
     title = Column(String)
     created_at = Column(DateTime, default=_now)
     updated_at = Column(DateTime, default=_now)
+    deleted_at = Column(DateTime, nullable=True) # Soft-delete for Recycle Bin
 
 
 class Message(Base):
     __tablename__ = "messages"
 
     id = Column(String, primary_key=True, default=_uuid)
-    session_id = Column(String, ForeignKey("sessions.id"))
+    session_id = Column(String, ForeignKey("sessions.id"), nullable=True)
     role = Column(String)
     content = Column(Text)
     token_count = Column(Integer)
@@ -74,7 +77,7 @@ class ToolCall(Base):
     __tablename__ = "tool_calls"
 
     id = Column(String, primary_key=True, default=_uuid)
-    session_id = Column(String, ForeignKey("sessions.id"))
+    session_id = Column(String, ForeignKey("sessions.id"), nullable=True)
     tool_name = Column(String)
     request_payload = Column(JSON)
     response_status = Column(String)
@@ -171,6 +174,11 @@ class RequestLog(Base):
     session_context_before = Column(JSON)
     session_context_after = Column(JSON)
 
+    # ── C.4 Shadow Mode — HybridIntentClassifier parallel logging ──
+    shadow_domain = Column(String, nullable=True)      # domain chosen by HybridIntentClassifier
+    shadow_intent = Column(String, nullable=True)      # primary_intent from HybridIntentClassifier
+    shadow_confidence = Column(Integer, nullable=True) # confidence from HybridIntentClassifier
+
     # ── Metadata ──
     total_time_ms = Column(Integer)
     error = Column(Text)                  # populated if a fatal error occurred
@@ -182,6 +190,23 @@ def init_db() -> None:
     _ensure_session_context_columns()
     _ensure_user_columns()
     _ensure_user_profile_columns()
+    _ensure_request_log_shadow_columns()
+    _ensure_session_soft_delete_column()
+
+
+def _ensure_session_soft_delete_column() -> None:
+    """Add deleted_at column to sessions table for Recycle Bin."""
+    if not settings.DATABASE_URL.startswith("sqlite"):
+        return
+    with engine.connect() as conn:
+        try:
+            result = conn.exec_driver_sql("PRAGMA table_info(sessions)")
+            existing = {row[1] for row in result.fetchall()}
+            if "deleted_at" not in existing:
+                conn.exec_driver_sql("ALTER TABLE sessions ADD COLUMN deleted_at DATETIME")
+            conn.commit()
+        except Exception:
+            pass
 
 
 def _ensure_session_context_columns() -> None:
@@ -229,9 +254,31 @@ def _ensure_user_profile_columns() -> None:
             result = conn.exec_driver_sql("PRAGMA table_info(user_profiles)")
             existing = {row[1] for row in result.fetchall()}
             # Add new aligned columns (old ones remain for any existing rows)
-            for col in ["platforms", "genres", "fav_movies", "fav_actors", "fav_directors"]:
+            for col in ["platforms", "genres", "fav_movies", "fav_actors", "fav_directors", "watchlist", "favorites"]:
                 if col not in existing:
                     conn.exec_driver_sql(f"ALTER TABLE user_profiles ADD COLUMN {col} JSON")
+            conn.commit()
+        except Exception:
+            pass
+
+
+def _ensure_request_log_shadow_columns() -> None:
+    """C.4 — Add shadow mode columns for HybridIntentClassifier parallel logging."""
+    if not settings.DATABASE_URL.startswith("sqlite"):
+        return
+    with engine.connect() as conn:
+        try:
+            result = conn.exec_driver_sql("PRAGMA table_info(request_logs)")
+            existing = {row[1] for row in result.fetchall()}
+            for col, typ in [
+                ("shadow_domain", "TEXT"),
+                ("shadow_intent", "TEXT"),
+                ("shadow_confidence", "INTEGER"),
+            ]:
+                if col not in existing:
+                    conn.exec_driver_sql(
+                        f"ALTER TABLE request_logs ADD COLUMN {col} {typ}"
+                    )
             conn.commit()
         except Exception:
             pass

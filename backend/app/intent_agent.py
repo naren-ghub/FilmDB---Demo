@@ -21,69 +21,54 @@ Schema:
 }
 
 Valid primary intents:
-ENTITY_LOOKUP, ANALYTICAL_EXPLANATION, RECOMMENDATION, DOWNLOAD,
-LEGAL_DOWNLOAD, ILLEGAL_DOWNLOAD_REQUEST, STREAMING_AVAILABILITY,
-REVIEWS, TRENDING, UPCOMING, TOP_RATED, COMPARISON,
-PERSON_LOOKUP, OSCAR_LOOKUP, GENERAL_AWARD_LOOKUP, GREETING, GENERAL_CONVERSATION,
-PLOT_EXPLANATION, CRITIC_REVIEW, MOVIE_SIMILARITY, FILMOGRAPHY, FILM_ANALYSIS, OFFICIAL
+ENTITY_LOOKUP, FILM_ANALYSIS, RECOMMENDATION, COMPARISON,
+PERSON_LOOKUP, FILMOGRAPHY, PLOT_EXPLANATION,
+STREAMING_AVAILABILITY, DOWNLOAD, ILLEGAL_DOWNLOAD_REQUEST,
+AWARD_LOOKUP, TRENDING, UPCOMING, TOP_RATED,
+BOT_INTERACTION
 
 Classification rules:
-- "hi", "hello", "hey", greetings → GREETING (confidence: 100)
-- "what is your name", "what can you do", general social talk → GENERAL_CONVERSATION (confidence: 80)
-- CRITICAL: If the message mentions ANY movie, person, or specific film concept, DO NOT use GENERAL_CONVERSATION. Use specific intents like ENTITY_LOOKUP, FILM_ANALYSIS, etc.
-- "<movie> or <movie>", "which is better <movie> or <movie>", "opinion on <movie> vs <movie>" → COMPARISON (with secondary FILM_ANALYSIS, CRITIC_SUMMARY, PLOT_EXPLANATION)
-- "who is better <person> or <person>", "comparison between <person> and <person>", "<person> vs <person>" → COMPARISON (with secondary FILM_ANALYSIS)
-- "compare <movie> and <movie>" → COMPARISON
+- "hi", "hello", "hey", "what is your name", "what can you do", "help me" → BOT_INTERACTION (confidence: 100)
+- CRITICAL: If the message mentions ANY movie, person, or film concept, DO NOT use BOT_INTERACTION.
 - "tell me about <movie>", "details of <movie>" → ENTITY_LOOKUP
 - "tell me about <person>", "who is <person>" → PERSON_LOOKUP
-- "analyze <movie>", "film analysis of <movie>", "critical analysis", "opinion on <movie>" → FILM_ANALYSIS
-- "cinematic style of <director>", "what makes <director> unique" → FILM_ANALYSIS
-- CRITICAL: Movie titles can sound like people's names (e.g. "Marty Supreme", "Mary Poppins", "The Godfather"). If a query is "tell me about X", and X could be a movie title, prefer ENTITY_LOOKUP unless the user explicitly mentions "actor", "director", or "who is".
-- "interstellar movie card", "show me the poster for avatar", "details of matrix" → ENTITY_LOOKUP
-- "movies similar to <movie>" → MOVIE_SIMILARITY
+- "analyze <movie>", "critical analysis", "opinion on", "what makes <movie> great", "review of", "critics say about", "cinematic style of", "why is <movie> controversial" → FILM_ANALYSIS
+- "what is <film concept>", "explain <theory>", "diegetic vs non-diegetic", "the male gaze in cinema", "auteur theory" → FILM_ANALYSIS
+- "Tell me about German Expressionism", "French New Wave", "Italian Neorealism" → FILM_ANALYSIS
+- "<movie> vs <movie>", "compare", "which is better" → COMPARISON
+- "movies similar to <movie>", "recommend", "suggest films" → RECOMMENDATION
+- "filmography of <person>", "movies directed by" → FILMOGRAPHY
+- "explain the plot of <movie>" → PLOT_EXPLANATION
+- "where can I stream", "what's new on netflix" → STREAMING_AVAILABILITY
+- "download <movie>" → DOWNLOAD
+- "torrent", "pirated", "cracked" → ILLEGAL_DOWNLOAD_REQUEST
+- "oscar", "academy awards", "best picture", "golden globes", "what awards" → AWARD_LOOKUP
 - "trending movies", "what's popular" → TRENDING
 - "top rated movies" → TOP_RATED
 - "upcoming releases" → UPCOMING
-- "oscar", "academy awards", "best picture" → OSCAR_LOOKUP
-- "awards", "emmys", "golden globes", "what did they win" → GENERAL_AWARD_LOOKUP
-- "review of <movie>", "what do critics say about <movie>" → CRITIC_REVIEW
-- "what's new on netflix", "where can I stream" → STREAMING_AVAILABILITY
-- "download <movie>" → DOWNLOAD
-- "explain the plot of <movie>", "plot of <movie>" → PLOT_EXPLANATION
-- "filmography of <person>", "movies directed by <person>" → FILMOGRAPHY
-- "official website of <movie>", "official trailer", "links for <movie>" → OFFICIAL
-- When a specific movie title is mentioned → always extract it as an entity
-- When a specific person name is mentioned → always extract it as an entity
-- For COMPARISON: extract BOTH movie or person entities
-- CRITICAL: If the user explicitly asks for a "movie card", "poster", or "details", you MUST classify it as ENTITY_LOOKUP. Do NOT fall back to GENERAL_CONVERSATION.
+- CRITICAL: Movie titles can sound like people's names (e.g. "Marty Supreme", "Mary Poppins"). Prefer ENTITY_LOOKUP unless "who is" or "actor"/"director" is mentioned.
+- Always extract mentioned movie titles and person names as entities.
+- For COMPARISON: extract BOTH entities.
 
 Entity format: [{"type": "movie"|"person"|"genre"|"year"|"platform", "value": "..."}]
 
 Examples:
-- "hi" → {"primary_intent": "GREETING", "secondary_intents": [], "entities": [], "confidence": 100}
-- "who is stanley kubrick", "who is miyazaki" → {"primary_intent": "PERSON_LOOKUP", "secondary_intents": [], "entities": [{"type": "person", "value": "Stanley Kubrick"}], "confidence": 95}
-- "What is Inception about?", "give overview of kottukkali" → {"primary_intent": "ENTITY_LOOKUP", "secondary_intents": [], "entities": [{"type": "movie", "value": "Inception"}], "confidence": 95}
-- "interstellar movie card", "show me the poster for avatar", "details of matrix" → {"primary_intent": "ENTITY_LOOKUP", "secondary_intents": [], "entities": [{"type": "movie", "value": "Interstellar"}], "confidence": 95}
-- "Why is Kubrick's A Clockwork Orange controversial" → {"primary_intent": "ANALYTICAL_EXPLANATION", "secondary_intents": ["FILM_ANALYSIS"], "entities": [{"type": "movie", "value": "A Clockwork Orange"}, {"type": "person", "value": "Stanley Kubrick"}], "confidence": 90}
-- "where can I stream The Batman" → {"primary_intent": "STREAMING_AVAILABILITY", "secondary_intents": [], "entities": [{"type": "movie", "value": "The Batman"}], "confidence": 95}
-- "movies similar to Interstellar" → {"primary_intent": "MOVIE_SIMILARITY", "secondary_intents": ["RECOMMENDATION"], "entities": [{"type": "movie", "value": "Interstellar"}], "confidence": 90}
-- "where can i download inception" → {"primary_intent": "DOWNLOAD", "secondary_intents": [""], "entities": [{"type": "movie", "value": "Inception"}], "confidence": 95}
-- "legal download for avatar" → {"primary_intent": "LEGAL_DOWNLOAD", "secondary_intents": [""], "entities": [{"type": "movie", "value": "Avatar"}], "confidence": 95}
-- "trending tamil movies", "what are the current trending films" → {"primary_intent": "TRENDING", "secondary_intents": [], "entities": [{"type": "language", "value": "tamil"}], "confidence": 95}
-- "top rated english films" → {"primary_intent": "TOP_RATED", "secondary_intents": [], "entities": [{"type": "language", "value": "english"}], "confidence": 95}
-- "upcoming releases 2026", "new movies coming out soon" → {"primary_intent": "UPCOMING", "secondary_intents": [], "entities": [{"type": "year", "value": "2026"}], "confidence": 95}
-- "what's new on netflix" → {"primary_intent": "STREAMING_AVAILABILITY", "secondary_intents": [], "entities": [{"type": "platform", "value": "netflix"}], "confidence": 95}
-- "oscar nominations 2026", "what academy awards did hitman win" → {"primary_intent": "OSCAR_LOOKUP", "secondary_intents": ["GENERAL_AWARD_LOOKUP"], "entities": [{"type": "year", "value": "2026"}], "confidence": 95}
-- "what awards has DiCaprio won", "golden globes for inception" → {"primary_intent": "GENERAL_AWARD_LOOKUP", "secondary_intents": ["OSCAR_LOOKUP"], "entities": [{"type": "person", "value": "DiCaprio"}], "confidence": 95}
-- "explain the plot of Inception" → {"primary_intent": "PLOT_EXPLANATION", "secondary_intents": ["FILM_ANALYSIS"], "entities": [{"type": "movie", "value": "Inception"}], "confidence": 95}
-- "what do critics say about The Dark Knight" → {"primary_intent": "CRITIC_REVIEW", "secondary_intents": ["FILM_ANALYSIS"], "entities": [{"type": "movie", "value": "The Dark Knight"}], "confidence": 95}
-- "stanley kubrick filmography", "movies directed by Scorsese" → {"primary_intent": "FILMOGRAPHY", "secondary_intents": ["PERSON_LOOKUP","FILM_ANALYSIS"], "entities": [{"type": "person", "value": "Stanley Kubrick"}], "confidence": 95}
-- "compare Inception and Interstellar" → {"primary_intent": "COMPARISON", "secondary_intents": ["FILM_ANALYSIS","PLOT_EXPLANATION"], "entities": [{"type": "movie", "value": "Inception"}, {"type": "movie", "value": "Interstellar"},{"type": "movie", "value": "Inception"}], "confidence": 95}
-- "analyze Antonioni's visual style" → {"primary_intent": "FILM_ANALYSIS", "secondary_intents": ["CRITIC_REVIEW","PLOT_EXPLANATION"], "entities": [{"type": "person", "value": "Antonioni"}], "confidence": 90}
-- "suggest good thriller movies released past 2 weeks" → {"primary_intent": "RECOMMENDATION", "secondary_intents": ["TRENDING"], "entities": [{"type": "genre", "value": "thriller"}], "confidence": 90}
-- "Which movie do you think is great: 2001 or Interstellar?" → {"primary_intent": "COMPARISON", "secondary_intents": ["FILM_ANALYSIS", "CRITIC_REVIEW", "PLOT_EXPLANATION"], "entities": [{"type": "movie", "value": "2001: A Space Odyssey"}, {"type": "movie", "value": "Interstellar"}], "confidence": 95}
-- "hello", "what's up", "who are you" → {"primary_intent": "GREETING", "secondary_intents": ["GENERAL_CONVERSATION"], "entities": [], "confidence": 100}
+- "hi" → {"primary_intent": "BOT_INTERACTION", "secondary_intents": [], "entities": [], "confidence": 100}
+- "who is stanley kubrick" → {"primary_intent": "PERSON_LOOKUP", "secondary_intents": [], "entities": [{"type": "person", "value": "Stanley Kubrick"}], "confidence": 95}
+- "What is Inception about?" → {"primary_intent": "ENTITY_LOOKUP", "secondary_intents": [], "entities": [{"type": "movie", "value": "Inception"}], "confidence": 95}
+- "Why is Kubrick's A Clockwork Orange controversial" → {"primary_intent": "FILM_ANALYSIS", "secondary_intents": [], "entities": [{"type": "movie", "value": "A Clockwork Orange"}, {"type": "person", "value": "Stanley Kubrick"}], "confidence": 90}
+- "what do critics say about The Dark Knight" → {"primary_intent": "FILM_ANALYSIS", "secondary_intents": [], "entities": [{"type": "movie", "value": "The Dark Knight"}], "confidence": 95}
+- "movies similar to Interstellar" → {"primary_intent": "RECOMMENDATION", "secondary_intents": [], "entities": [{"type": "movie", "value": "Interstellar"}], "confidence": 90}
+- "compare Inception and Interstellar" → {"primary_intent": "COMPARISON", "secondary_intents": ["FILM_ANALYSIS"], "entities": [{"type": "movie", "value": "Inception"}, {"type": "movie", "value": "Interstellar"}], "confidence": 95}
+- "oscar nominations 2026" → {"primary_intent": "AWARD_LOOKUP", "secondary_intents": [], "entities": [{"type": "year", "value": "2026"}], "confidence": 95}
+- "what awards has DiCaprio won" → {"primary_intent": "AWARD_LOOKUP", "secondary_intents": [], "entities": [{"type": "person", "value": "DiCaprio"}], "confidence": 95}
+- "explain the plot of Inception" → {"primary_intent": "PLOT_EXPLANATION", "secondary_intents": [], "entities": [{"type": "movie", "value": "Inception"}], "confidence": 95}
+- "analyze Antonioni's visual style" → {"primary_intent": "FILM_ANALYSIS", "secondary_intents": [], "entities": [{"type": "person", "value": "Antonioni"}], "confidence": 90}
+- "What is the auteur theory?" → {"primary_intent": "FILM_ANALYSIS", "secondary_intents": [], "entities": [], "confidence": 85}
 - "is cgi ruining films" → {"primary_intent": "FILM_ANALYSIS", "secondary_intents": [], "entities": [], "confidence": 80}
+- "where can I stream The Batman" → {"primary_intent": "STREAMING_AVAILABILITY", "secondary_intents": [], "entities": [{"type": "movie", "value": "The Batman"}], "confidence": 95}
+- "stanley kubrick filmography" → {"primary_intent": "FILMOGRAPHY", "secondary_intents": ["PERSON_LOOKUP"], "entities": [{"type": "person", "value": "Stanley Kubrick"}], "confidence": 95}
+- "suggest good thriller movies" → {"primary_intent": "RECOMMENDATION", "secondary_intents": [], "entities": [{"type": "genre", "value": "thriller"}], "confidence": 90}
 
 IMPORTANT: Always return confidence >= 70 for any film-related query.
 Return confidence 100 for greetings.
@@ -131,10 +116,11 @@ class IntentAgent:
             "hi", "hello", "hey", "hii", "hiii", "yo", "sup",
             "good morning", "good afternoon", "good evening",
             "howdy", "what's up", "whats up", "hola",
+            "what can you do", "help", "how does this work"
         }
         if text in greetings:
             return {
-                "primary_intent": "GREETING",
+                "primary_intent": "BOT_INTERACTION",
                 "secondary_intents": [],
                 "entities": [],
                 "confidence": 100,
@@ -143,7 +129,7 @@ class IntentAgent:
 
     def _parse_intent(self, content: str) -> dict[str, Any]:
         default = {
-            "primary_intent": "GENERAL_CONVERSATION",
+            "primary_intent": "BOT_INTERACTION",
             "secondary_intents": [],
             "entities": [],
             "confidence": 70,
@@ -183,8 +169,35 @@ class IntentAgent:
             confidence = 70
 
         # Ensure minimum confidence for any valid intent
-        if confidence < 50 and primary not in ("GREETING", "GENERAL_CONVERSATION"):
+        if confidence < 50 and primary not in ("BOT_INTERACTION",):
             confidence = 50
+
+        # Backward compatibility: map deprecated intents to consolidated ones
+        _INTENT_COMPAT = {
+            "ANALYTICAL_EXPLANATION": "FILM_ANALYSIS",
+            "CRITIC_REVIEW":         "FILM_ANALYSIS",
+            "REVIEWS":               "FILM_ANALYSIS",
+            "MOVIE_SIMILARITY":      "RECOMMENDATION",
+            "LEGAL_DOWNLOAD":        "DOWNLOAD",
+            "OSCAR_LOOKUP":          "AWARD_LOOKUP",
+            "GENERAL_AWARD_LOOKUP":  "AWARD_LOOKUP",
+            "OFFICIAL":              "ENTITY_LOOKUP",
+            "GREETING":              "BOT_INTERACTION",
+            "GENERAL_CONVERSATION":  "BOT_INTERACTION"
+        }
+        primary = _INTENT_COMPAT.get(primary, primary)
+        secondary = [_INTENT_COMPAT.get(s, s) for s in secondary]
+
+        # A.2 — Normalise entity type strings from LLM ("movie_title" → "movie" etc.)
+        _TYPE_NORM = {
+            "movie_title": "movie", "film": "movie", "movie title": "movie",
+            "person_name": "person", "director": "person", "actor": "person",
+            "award": "award_event", "award_event": "award_event",
+        }
+        for ent in entities:
+            if isinstance(ent, dict):
+                raw = ent.get("type", "").lower().strip()
+                ent["type"] = _TYPE_NORM.get(raw, raw)
 
         return {
             "primary_intent": primary,

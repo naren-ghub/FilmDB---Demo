@@ -35,13 +35,8 @@ TOOL_REGISTRY = {
         "description": "IMDb awards and nominations for a movie",
         "required": [],
     },
-    # "cinema_search": {
-    #     "name": "cinema_search",
-    #     "description": "Domain-restricted web search for cinema news, reviews, awards, and trends",
-    #     "required": ["query"],
-    # },
 
-    # ── KB-powered tools ─────────────────────────────────────────────────
+    # ── KB-powered tools ─────────────────────────────────────────────
     "kb_entity": {
         "name": "kb_entity",
         "description": "KB movie entity lookup (local data)",
@@ -50,11 +45,6 @@ TOOL_REGISTRY = {
     "kb_plot": {
         "name": "kb_plot",
         "description": "KB Wikipedia plot retrieval",
-        "required": ["title"],
-    },
-    "kb_critic": {
-        "name": "kb_critic",
-        "description": "KB Rotten Tomatoes critic summary",
         "required": ["title"],
     },
     "kb_similarity": {
@@ -77,15 +67,39 @@ TOOL_REGISTRY = {
         "description": "KB side-by-side movie comparison",
         "required": ["title_a", "title_b"],
     },
-    "kb_film_analysis": {
-        "name": "kb_film_analysis",
-        "description": "KB film analysis articles from scraped editorial sources (BFI, Senses of Cinema)",
-        "required": [],
-    },
     "kb_awards": {
         "name": "kb_awards",
         "description": "KB local Oscar nominations and wins for a movie or person",
         "required": [],
+    },
+
+    # ── Semantic RAG tools ─────────────────────────────────────────────
+    "rag_essays": {
+        "name": "rag_essays",
+        "description": (
+            "Semantic RAG retrieval over film analysis essays (Senses of Cinema, BFI). "
+            "Use for questions about directors, cinematic style, critical significance, "
+            "film appreciation, and 'why is X great' queries."
+        ),
+        "required": ["query"],
+    },
+    "rag_books": {
+        "name": "rag_books",
+        "description": (
+            "Semantic RAG retrieval over 318 classified cinema books "
+            "(film theory, criticism, history, aesthetics, production, scripts). "
+            "Use for conceptual questions, theoretical analysis, techniques, and historical context."
+        ),
+        "required": ["query", "domain"],  # domain: film_theory|film_criticism|film_history|film_aesthetics|film_production|scripts
+    },
+    "rag_scripts": {
+        "name": "rag_scripts",
+        "description": (
+            "Semantic RAG retrieval over movie screenplays and scripts. "
+            "Use when the user asks about dialogue, scenes, or script structure "
+            "for a specific movie or person."
+        ),
+        "required": ["query"],
     },
 }
 
@@ -142,7 +156,7 @@ def filter_tool_calls(
 def filter_tool_calls(
     user_message: str,
     tool_calls: list[dict[str, Any]],
-    max_tools: int = 4,
+    max_tools: int = 5,
     return_rejections: bool = False,
 ) -> list[dict[str, Any]] | tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     approved: list[dict[str, Any]] = []

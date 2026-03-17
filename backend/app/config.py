@@ -6,10 +6,14 @@ load_dotenv(override=True)
 
 class Settings:
     GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-    GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
-    GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-    GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
-    DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./FilmDB_Demo.db")
+    GROQ_RESPONSE_API_KEY = os.getenv("GROQ_RESPONSE_API_KEY")
+    GROQ_MODEL = os.getenv("GROQ_MODEL", "qwen/qwen3-32b")
+    # Calculate project root (assuming this file is in backend/app/config.py)
+    BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    _DB_NAME = "FilmDB_Demo.db"
+    _ABS_DB_PATH = os.path.join(BASE_DIR, _DB_NAME)
+    
+    DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite:///{_ABS_DB_PATH}")
     ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
     RAPIDAPI_KEY = os.getenv("RAPIDAPI_KEY")
     IMDB_HOST = os.getenv("IMDB_HOST", "imdb8.p.rapidapi.com")

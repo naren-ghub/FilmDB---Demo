@@ -2,7 +2,7 @@ from app.utils.prompt_builder import build_prompt
 
 
 def test_build_prompt_sections():
-    prompt = build_prompt(
+    system, user, context = build_prompt(
         system_instructions="You are FilmDB",
         user_profile={"region": "US"},
         recent_messages=[{"role": "user", "content": "Hi"}],
@@ -10,8 +10,9 @@ def test_build_prompt_sections():
         user_query="Tell me about Inception",
     )
 
-    assert "SYSTEM:" in prompt
-    assert "USER PROFILE:" in prompt
-    assert "RECENT CONVERSATION:" in prompt
-    assert "TOOL DATA:" in prompt
-    assert "USER QUERY:" in prompt
+    assert "FilmDB" in system
+    assert "region" in system  # profile goes into system
+    assert len(context) == 1  # one history message
+    assert context[0]["role"] == "user"
+    assert "Inception" in user
+    assert "REFERENCE DATA" in user  # tool data present

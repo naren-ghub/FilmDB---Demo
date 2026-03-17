@@ -9,7 +9,7 @@ Output layers:
     1.5 person_index.parquet        — Pre-aggregated person filmography index
     2.  metadata_layer.parquet      — TMDB enrichment (overview, popularity…)
     3.  plot_layer.parquet          — Wikipedia plot summaries
-    4.  review_layer.parquet        — Rotten Tomatoes critic reviews
+
     5.  recommendation_layer.parquet — MovieLens aggregated ratings/tags
     6.  regional_layer.parquet      — Indian cinema regional data
 
@@ -170,6 +170,25 @@ def build_movie_entity() -> pd.DataFrame:
     else:
         movies["movielens_id"] = None
 
+    # ── Cross-reference: Regional Data (Indian Movies) ────────────────────
+    indian_path = INDIAN_DIR / "indian movies.csv"
+    if indian_path.exists():
+        log.info(f"  Merging Regional data (language, region) …")
+        indian = pd.read_csv(
+            indian_path, dtype=str, low_memory=False, usecols=["ID", "Language"]
+        )
+        indian = indian.rename(columns={"ID": "imdb_id", "Language": "language"})
+        indian["region"] = "India"
+        
+        # Drop duplicates before merging
+        indian = indian.dropna(subset=["imdb_id"]).drop_duplicates(subset=["imdb_id"])
+        
+        movies = movies.merge(indian, on="imdb_id", how="left")
+        log.info(f"  Regional language matched: {movies['language'].notna().sum():,}")
+    else:
+        movies["language"] = None
+        movies["region"] = None
+
     # ── Save ───────────────────────────────────────────────────────────────
     _save_parquet(movies, "movie_entity.parquet")
     elapsed = time.monotonic() - start
@@ -290,119 +309,6 @@ def build_plot_layer(movie_entity: pd.DataFrame) -> pd.DataFrame:
     return plot_layer
 
 
-# ─── Layer 4: review_layer (Rotten Tomatoes) ────────────────────────────────
-
-def build_review_layer(movie_entity: pd.DataFrame) -> pd.DataFrame:
-    """
-    Map Rotten Tomatoes movie reviews to IMDb IDs.
-    Two-step: RT movies → IMDb ID, then join reviews via RT slug.
-    """
-    log.info("═══ Layer 4: review_layer (Rotten Tomatoes) ═══")
-    start = time.monotonic()
-
-    # ── Step 1: Load RT movies and map to imdb_id ──────────────────────────
-    rt_movies_path = RT_DIR / "rotten_tomatoes_movies.csv"
-    log.info(f"  Loading RT movies …")
-    rt_movies = pd.read_csv(
-        rt_movies_path,
-        dtype=str,
-        low_memory=False,
-        usecols=["id", "title", "releaseDateTheaters", "releaseDateStreaming",
-                 "tomatoMeter", "audienceScore", "genre", "director"],
-    )
-    rt_movies = rt_movies.dropna(subset=["title"])
-    log.info(f"  RT movies with title: {len(rt_movies):,}")
-
-    # Extract year from release dates
-    def _extract_year(row):
-        for col in ["releaseDateTheaters", "releaseDateStreaming"]:
-            val = row.get(col)
-            if isinstance(val, str) and len(val) >= 4:
-                return val[:4]
-        return ""
-
-    rt_movies["year"] = rt_movies.apply(_extract_year, axis=1)
-
-    # Build lookup from movie_entity
-    me = movie_entity[["imdb_id", "title", "year"]].dropna(subset=["title"]).copy()
-    me["_lookup"] = me["title"].str.lower().str.strip() + "|" + me["year"].fillna("").astype(str)
-    lookup_dict = dict(zip(me["_lookup"], me["imdb_id"]))
-
-    title_only_dict: dict[str, str] = {}
-    for _, row in me.iterrows():
-        t = str(row["title"]).lower().strip()
-        if t not in title_only_dict:
-            title_only_dict[t] = row["imdb_id"]
-
-    log.info(f"  Matching RT movies to IMDb IDs …")
-    rt_matched = []
-    for _, row in tqdm(rt_movies.iterrows(), total=len(rt_movies), desc="  RT→IMDb"):
-        title_norm = str(row["title"]).lower().strip()
-        year_str = str(row.get("year", "")).strip()
-        key = title_norm + "|" + year_str
-
-        imdb_id = lookup_dict.get(key)
-        if not imdb_id:
-            imdb_id = title_only_dict.get(title_norm)
-        rt_matched.append(imdb_id)
-
-    rt_movies["imdb_id"] = rt_matched
-    rt_slug_to_imdb = dict(zip(rt_movies["id"], rt_movies["imdb_id"]))
-
-    matched_movies = rt_movies["imdb_id"].notna().sum()
-    log.info(f"  RT movies matched: {matched_movies:,} / {len(rt_movies):,}")
-
-    # ── Step 2: Load RT reviews and join via slug ──────────────────────────
-    rt_reviews_path = RT_DIR / "rotten_tomatoes_movie_reviews.csv"
-    log.info(f"  Loading RT reviews (chunked) …")
-
-    review_chunks = []
-    chunk_count = 0
-    for chunk in pd.read_csv(
-        rt_reviews_path,
-        dtype=str,
-        low_memory=False,
-        chunksize=100_000,
-        usecols=["id", "criticName", "reviewText", "scoreSentiment",
-                 "originalScore", "isTopCritic", "reviewState"],
-    ):
-        chunk["imdb_id"] = chunk["id"].map(rt_slug_to_imdb)
-        # Keep only matched reviews with actual text
-        matched_chunk = chunk[
-            chunk["imdb_id"].notna() &
-            chunk["reviewText"].notna() &
-            (chunk["reviewText"].str.len() > 20)
-        ].copy()
-        if len(matched_chunk) > 0:
-            review_chunks.append(matched_chunk[[
-                "imdb_id", "id", "criticName", "reviewText",
-                "scoreSentiment", "originalScore", "isTopCritic", "reviewState",
-            ]])
-        chunk_count += 1
-
-    log.info(f"  Processed {chunk_count} chunks")
-
-    if review_chunks:
-        review_layer = pd.concat(review_chunks, ignore_index=True)
-        review_layer = review_layer.rename(columns={
-            "id": "rt_id",
-            "criticName": "critic_name",
-            "reviewText": "review_text",
-            "scoreSentiment": "sentiment",
-            "originalScore": "score",
-            "isTopCritic": "is_top_critic",
-            "reviewState": "review_state",
-        })
-    else:
-        review_layer = pd.DataFrame(columns=[
-            "imdb_id", "rt_id", "critic_name", "review_text",
-            "sentiment", "score", "is_top_critic", "review_state",
-        ])
-
-    _save_parquet(review_layer, "review_layer.parquet")
-    elapsed = time.monotonic() - start
-    log.info(f"  Layer 4 done in {elapsed:.1f}s\n")
-    return review_layer
 
 
 # ─── Layer 5: recommendation_layer (MovieLens) ──────────────────────────────
@@ -493,6 +399,31 @@ def build_recommendation_layer(movie_entity: pd.DataFrame) -> pd.DataFrame:
     # Add movielens_id back
     imdb_to_ml = {v: k for k, v in ml_to_imdb.items()}
     rec_layer["movielens_id"] = rec_layer["imdb_id"].map(imdb_to_ml)
+    
+    # ── E.5: Enrich with TMDB Keywords ──────────────
+    log.info(f"  Enriching tags with TMDB keywords from metadata_layer …")
+    metadata_path = OUT_DIR / "metadata_layer.parquet"
+    if metadata_path.exists():
+        metadata_df = pd.read_parquet(metadata_path, columns=["imdb_id", "keywords"])
+        rec_layer = rec_layer.merge(metadata_df, on="imdb_id", how="left")
+        
+        # Merge MovieLens tags and TMDB keywords
+        def merge_tags(row):
+            ml_tag_list = str(row.get("ml_tags", "")).split("|") if pd.notna(row.get("ml_tags")) else []
+            tmdb_keywords = str(row.get("keywords", "")).split("|") if pd.notna(row.get("keywords")) else []
+            
+            combined = set()
+            for t in ml_tag_list + tmdb_keywords:
+                t = t.strip()
+                if t and t.lower() != "nan":
+                    combined.add(t)
+            
+            return "|".join(combined) if combined else None
+            
+        rec_layer["ml_tags"] = rec_layer.apply(merge_tags, axis=1)
+        rec_layer = rec_layer.drop(columns=["keywords"])
+    else:
+        log.warning("  metadata_layer missing, skipping TMDB keyword enrichment.")
 
     _save_parquet(rec_layer, "recommendation_layer.parquet")
     elapsed = time.monotonic() - start
@@ -812,8 +743,7 @@ def run_full_pipeline() -> None:
     # Layer 3: Wikipedia plots
     build_plot_layer(movie_entity)
 
-    # Layer 4: Rotten Tomatoes reviews
-    build_review_layer(movie_entity)
+
 
     # Layer 5: MovieLens recommendations
     build_recommendation_layer(movie_entity)
@@ -863,8 +793,7 @@ def run_single_layer(layer_num: float) -> None:
             build_metadata_layer(movie_entity)
         elif layer_num == 3:
             build_plot_layer(movie_entity)
-        elif layer_num == 4:
-            build_review_layer(movie_entity)
+
         elif layer_num == 5:
             build_recommendation_layer(movie_entity)
     elif layer_num == 6:

@@ -17,7 +17,15 @@ _BACKEND = Path(__file__).resolve().parent.parent.parent / "backend"
 if str(_BACKEND) not in sys.path:
     sys.path.insert(0, str(_BACKEND))
 
+from app.db import session_store as store
 from app.db.models import SessionLocal
+
+# Force refresh/check for required names
+if not hasattr(store, "soft_delete_session_db"):
+    # This might happen if uvicorn/streamlit cache is stale
+    import importlib
+    importlib.reload(store)
+
 from app.db.session_store import (
     authenticate_user,
     get_chat_sessions_db,
@@ -26,6 +34,10 @@ from app.db.session_store import (
     save_chat_sessions_db,
     save_profile_db,
     user_exists_db,
+    soft_delete_session_db,
+    restore_session_db,
+    get_deleted_chat_sessions_db,
+    hard_delete_expired_sessions_db,
 )
 
 
@@ -96,17 +108,72 @@ def get_chat_sessions(username: str) -> dict:
         db.close()
 
 
-# ─── Kept for compatibility (no longer needed for shared deployments) ─────────
+def soft_delete_session(session_id: str) -> bool:
+    db = _db()
+    try:
+        return soft_delete_session_db(db, session_id)
+    finally:
+        db.close()
 
-def set_last_active_user(_username: str) -> None:
-    """No-op: auto-login by username disabled for multi-user deployment."""
-    pass
+
+def restore_session(session_id: str) -> bool:
+    db = _db()
+    try:
+        return restore_session_db(db, session_id)
+    finally:
+        db.close()
 
 
-def get_last_active_user():
-    """Always returns None — session state is the source of truth."""
+def get_deleted_chat_sessions(username: str) -> dict:
+    db = _db()
+    try:
+        return get_deleted_chat_sessions_db(db, username)
+    finally:
+        db.close()
+
+
+def cleanup_expired_sessions() -> int:
+    db = _db()
+    try:
+        return hard_delete_expired_sessions_db(db)
+    finally:
+        db.close()
+
+
+import json
+import os
+
+_LAST_USER_FILE = Path(__file__).resolve().parent.parent.parent / ".filmdb_last_user.json"
+
+def set_last_active_user(username: str) -> None:
+    """Save the last active user to a local file for auto-login on refresh."""
+    try:
+        profile = get_profile(username)
+        data = {
+            "username": username,
+            "profile": profile
+        }
+        with open(_LAST_USER_FILE, "w", encoding="utf-8") as f:
+            json.dump(data, f)
+    except Exception:
+        pass
+
+
+def get_last_active_user() -> Optional[Dict[str, Any]]:
+    """Retrieve the last active user for auto-login on UI refresh."""
+    if _LAST_USER_FILE.exists():
+        try:
+            with open(_LAST_USER_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            pass
     return None
 
 
 def clear_last_active_user() -> None:
-    pass
+    """Clear the auto-login file."""
+    try:
+        if _LAST_USER_FILE.exists():
+            os.remove(_LAST_USER_FILE)
+    except Exception:
+        pass

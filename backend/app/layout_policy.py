@@ -24,14 +24,8 @@ def select_response_mode(
         return "AVAILABILITY_FOCUS"
     if primary_intent == "RECOMMENDATION":
         return "RECOMMENDATION_GRID"
-    if primary_intent == "MOVIE_SIMILARITY":
-        return "RECOMMENDATION_GRID"
-    if primary_intent == "ANALYTICAL_EXPLANATION":
-        return "EXPLANATION_PLUS_AVAILABILITY" if has_streaming else "EXPLANATION_ONLY"
     if primary_intent == "ENTITY_LOOKUP":
         return "FULL_CARD" if tool_outputs.get("imdb") or tool_outputs.get("kb_entity") else "MINIMAL_CARD"
-    if primary_intent == "REVIEWS":
-        return "EXPLANATION_PLUS_AVAILABILITY" if has_streaming else "EXPLANATION_ONLY"
     if primary_intent == "TRENDING":
         return "RECOMMENDATION_GRID"
     if primary_intent == "UPCOMING":
@@ -39,8 +33,6 @@ def select_response_mode(
     if primary_intent == "TOP_RATED":
         return "RECOMMENDATION_GRID"
     if primary_intent == "DOWNLOAD":
-        return "MINIMAL_CARD"
-    if primary_intent == "LEGAL_DOWNLOAD":
         return "MINIMAL_CARD"
     if primary_intent == "ILLEGAL_DOWNLOAD_REQUEST":
         return "EXPLANATION_ONLY"
@@ -50,11 +42,11 @@ def select_response_mode(
         return "FILMOGRAPHY_LIST"
     if primary_intent == "PLOT_EXPLANATION":
         return "ANALYSIS_TEXT"
-    if primary_intent == "CRITIC_REVIEW":
+    if primary_intent == "FILM_ANALYSIS":
         return "ANALYSIS_TEXT"
     if primary_intent == "COMPARISON":
         return "COMPARISON_TABLE"
-    if primary_intent in ("OSCAR_LOOKUP", "GENERAL_AWARD_LOOKUP"):
+    if primary_intent == "AWARD_LOOKUP":
         return "EXPLANATION_ONLY"
     if primary_intent in ("GREETING", "GENERAL_CONVERSATION"):
         return "EXPLANATION_ONLY"

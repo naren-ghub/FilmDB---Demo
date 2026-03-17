@@ -3,6 +3,7 @@ from pydantic import BaseModel
 
 from app.conversation_engine import ConversationEngine
 from app.db.models import init_db
+from app.utils.tool_formatter import _sanitize_json
 
 app = FastAPI(title="FilmDB Demo")
 engine = ConversationEngine()
@@ -31,4 +32,5 @@ def startup() -> None:
 
 @app.post("/chat")
 async def chat(request: ChatRequest):
-    return await engine.run(request.session_id, request.user_id, request.message)
+    result = await engine.run(request.session_id, request.user_id, request.message)
+    return _sanitize_json(result)

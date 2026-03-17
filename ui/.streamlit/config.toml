@@ -5,7 +5,7 @@ runOnSave = true
 [theme]
 primaryColor = "#c9a227"
 backgroundColor = "#0d0d0d"
-secondaryBackgroundColor = "#1a1a2e"
+secondaryBackgroundColor = "#0d0c1eff"
 textColor = "#e8e8e8"
 font = "sans serif"
 

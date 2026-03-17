@@ -5,8 +5,16 @@ from typing import Any, Dict, cast
 import bcrypt
 from sqlalchemy.orm import Session
 
-from app.db.models import Message, RequestLog, SessionContext, SessionLocal, ToolCall, User, UserProfile
-from app.db.models import Session as ChatSession
+from app.db.models import (
+    ChatSession,
+    Message,
+    RequestLog,
+    SessionContext,
+    SessionLocal,
+    ToolCall,
+    User,
+    UserProfile,
+)
 
 
 
@@ -184,7 +192,7 @@ def save_profile_db(db: Session, username: str, profile: Dict[str, Any]) -> None
     key = username.lower()
     existing = db.query(UserProfile).filter(UserProfile.user_id == key).first()
     if existing:
-        for field in ["region", "platforms", "genres", "fav_movies", "fav_actors", "fav_directors"]:
+        for field in ["region", "platforms", "genres", "fav_movies", "fav_actors", "fav_directors", "watchlist", "favorites"]:
             if field in profile:
                 setattr(existing, field, profile[field])
         cast(Any, existing).updated_at = datetime.utcnow()
@@ -197,6 +205,8 @@ def save_profile_db(db: Session, username: str, profile: Dict[str, Any]) -> None
             fav_movies=profile.get("fav_movies"),
             fav_actors=profile.get("fav_actors"),
             fav_directors=profile.get("fav_directors"),
+            watchlist=profile.get("watchlist"),
+            favorites=profile.get("favorites"),
             created_at=datetime.utcnow(),
             updated_at=datetime.utcnow(),
         )
@@ -216,14 +226,17 @@ def get_profile_db(db: Session, username: str) -> Dict[str, Any] | None:
         "fav_movies": prof.fav_movies or [],
         "fav_actors": prof.fav_actors or [],
         "fav_directors": prof.fav_directors or [],
+        "watchlist": prof.watchlist or [],
+        "favorites": prof.favorites or [],
     }
 
+
+import json
 
 def save_chat_sessions_db(db: Session, username: str, sessions: dict) -> None:
     """Persist all chat sessions for a user (upsert session title + messages)."""
     key = username.lower()
-    # Keep only last 30 sessions
-    items = list(sessions.items())[-30:]
+    items = list(sessions.items())
     for sid, sdata in items:
         chat_session = db.query(ChatSession).filter(ChatSession.id == sid).first()
         if not chat_session:
@@ -238,8 +251,11 @@ def save_chat_sessions_db(db: Session, username: str, sessions: dict) -> None:
         else:
             cast(Any, chat_session).title = sdata.get("title", chat_session.title)
             cast(Any, chat_session).updated_at = datetime.utcnow()
+            
+        # Sync messages for this session
+        if "messages" in sdata and len(sdata["messages"]) == 0:
+            db.query(Message).filter(Message.session_id == sid).delete()
     db.commit()
-
 
 def get_chat_sessions_db(db: Session, username: str) -> dict:
     """Return all chat sessions for a user as a dict keyed by session_id."""
@@ -247,8 +263,9 @@ def get_chat_sessions_db(db: Session, username: str) -> dict:
     sessions = (
         db.query(ChatSession)
         .filter(ChatSession.user_id == key)
+        .filter(ChatSession.deleted_at == None) # Skip Recycle Bin
         .order_by(ChatSession.created_at.desc())
-        .limit(30)
+        .limit(100)
         .all()
     )
     result = {}
@@ -260,18 +277,98 @@ def get_chat_sessions_db(db: Session, username: str) -> dict:
             .order_by(Message.created_at.asc())
             .all()
         )
+        msg_list = []
+        for m in msgs:
+            msg_dict = {"role": m.role, "content": m.content}
+            if m.role == "assistant":
+                try:
+                    parsed = json.loads(m.content)
+                    if isinstance(parsed, dict):
+                        msg_dict.update(parsed)
+                        if "text_response" not in msg_dict:
+                            msg_dict["text_response"] = parsed.get("content", m.content)
+                    else:
+                        msg_dict["text_response"] = str(parsed)
+                except Exception:
+                    msg_dict["text_response"] = m.content
+            msg_list.append(msg_dict)
+            
         result[s.id] = {
             "title": s.title or "",
-            "messages": [
-                {
-                    "role": m.role,
-                    "content": m.content,
-                    **(json.loads(m.content) if m.role == "assistant" else {}),
-                }
-                for m in msgs
-            ],
+            "messages": msg_list,
         }
     return result
+
+
+def soft_delete_session_db(db: Session, session_id: str) -> bool:
+    """Move a session to the Recycle Bin."""
+    session = db.query(ChatSession).filter(ChatSession.id == session_id).first()
+    if session:
+        cast(Any, session).deleted_at = datetime.utcnow()
+        db.commit()
+        return True
+    return False
+
+
+def restore_session_db(db: Session, session_id: str) -> bool:
+    """Restore a session from the Recycle Bin."""
+    session = db.query(ChatSession).filter(ChatSession.id == session_id).first()
+    if session:
+        cast(Any, session).deleted_at = None
+        db.commit()
+        return True
+    return False
+
+
+def get_deleted_chat_sessions_db(db: Session, username: str) -> dict:
+    """Return sessions currently in the Recycle Bin (deleted within last 3 days)."""
+    from datetime import timedelta
+    three_days_ago = datetime.utcnow() - timedelta(days=3)
+    
+    key = username.lower()
+    sessions = (
+        db.query(ChatSession)
+        .filter(ChatSession.user_id == key)
+        .filter(ChatSession.deleted_at != None)
+        .filter(ChatSession.deleted_at >= three_days_ago)
+        .order_by(ChatSession.deleted_at.desc())
+        .all()
+    )
+    
+    result = {}
+    for s in sessions:
+        result[s.id] = {
+            "title": s.title if (s.title and s.title.strip()) else "Untitled Conversation",
+            "deleted_at": s.deleted_at.isoformat() if s.deleted_at else None
+        }
+    return result
+
+
+def hard_delete_expired_sessions_db(db: Session) -> int:
+    """Permanently delete sessions that have been in Recycle Bin for > 3 days."""
+    from datetime import timedelta
+    three_days_ago = datetime.utcnow() - timedelta(days=3)
+    
+    expired = (
+        db.query(ChatSession)
+        .filter(ChatSession.deleted_at != None)
+        .filter(ChatSession.deleted_at < three_days_ago)
+        .all()
+    )
+    
+    count = 0
+    for s in expired:
+        # Delete dependent messages first (SQLAlchemy Cascade would be better but let's be safe)
+        db.query(Message).filter(Message.session_id == s.id).delete()
+        db.query(ToolCall).filter(ToolCall.session_id == s.id).delete()
+        db.query(SessionContext).filter(SessionContext.session_id == s.id).delete()
+        db.query(RequestLog).filter(RequestLog.session_id == s.id).delete()
+        db.delete(s)
+        count += 1
+    
+    if count > 0:
+        db.commit()
+    return count
 
 
 # ─────────── Request Trace Logging ────────────────────────────────────────────
@@ -281,12 +378,13 @@ def log_request(trace: Dict[str, Any], response: Dict[str, Any], total_time_ms: 
     db = SessionLocal()
     try:
         intent = trace.get("intent", {})
-        routing = trace.get("routing_matrix", {})
+        routing = trace.get("tool_selector", {})
         tool_exec = trace.get("tool_execution", {})
         er = trace.get("entity_resolution", {})
         approved = [c.get("name") for c in trace.get("tool_calls_approved", []) if isinstance(c, dict)]
         rejected = [c.get("name") for c in trace.get("tool_calls_rejected", []) if isinstance(c, dict)]
 
+        shadow = trace.get("shadow_intent") or {}
         entry = RequestLog(
             session_id=trace.get("session_id"),
             user_id=trace.get("user_id"),
@@ -311,6 +409,10 @@ def log_request(trace: Dict[str, Any], response: Dict[str, Any], total_time_ms: 
             session_context_after=trace.get("session_context_after"),
             total_time_ms=total_time_ms,
             error=str(trace.get("fatal_error")) if trace.get("fatal_error") else None,
+            # C.4 — Shadow mode: HybridIntentClassifier parallel results
+            shadow_domain=shadow.get("domain"),
+            shadow_intent=shadow.get("intent"),
+            shadow_confidence=shadow.get("confidence"),
             created_at=datetime.utcnow(),
         )
         db.add(entry)

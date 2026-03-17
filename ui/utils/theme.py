@@ -530,6 +530,172 @@ def load_css() -> None:
         color: {TEXT_MUTED};
     }}
 
+    /* ═══════════════════  NEW UI ENHANCEMENTS (Glass, Shimmer, Carousel)  ═══════════════════ */
+    
+    /* 1. Glassmorphism Cards */
+    .filmdb-glass-card {{
+        background: rgba(20, 20, 34, 0.6) !important;
+        backdrop-filter: blur(14px) !important;
+        -webkit-backdrop-filter: blur(14px) !important;
+        border: 1px solid rgba(255, 255, 255, 0.08) !important;
+        box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3) !important;
+        transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1) !important;
+    }}
+    .filmdb-glass-card:hover {{
+        border-color: rgba(201, 162, 39, 0.4) !important;
+        box-shadow: 0 8px 32px 0 rgba(201, 162, 39, 0.15) !important;
+        transform: translateY(-2px) !important;
+    }}
+
+    /* 2. Shimmer Skeleton Loader (Thinking State) */
+    @keyframes shimmerSweep {{
+        0% {{ background-position: -200% 0; }}
+        100% {{ background-position: 200% 0; }}
+    }}
+    .filmdb-skeleton {{
+        display: flex; gap: 14px; align-items: flex-start; margin-bottom: 20px;
+    }}
+    .filmdb-skeleton-avatar {{
+        width: 38px; height: 38px; border-radius: 50%; flex-shrink: 0;
+        background: linear-gradient(90deg, #2c2c44 25%, #4a4a6a 50%, #2c2c44 75%);
+        background-size: 200% 100%;
+        animation: shimmerSweep 1.5s infinite linear;
+    }}
+    .filmdb-skeleton-content {{
+        flex: 1; display: flex; flex-direction: column; gap: 10px; padding-top: 6px;
+    }}
+    .filmdb-skeleton-bar {{
+        height: 12px; border-radius: 6px;
+        background: linear-gradient(90deg, #2c2c44 25%, #4a4a6a 50%, #2c2c44 75%);
+        background-size: 200% 100%;
+        animation: shimmerSweep 1.5s infinite linear;
+    }}
+    .filmdb-skeleton-bar:nth-child(1) {{ width: 85%; }}
+    .filmdb-skeleton-bar:nth-child(2) {{ width: 60%; }}
+    .filmdb-skeleton-bar:nth-child(3) {{ width: 40%; }}
+
+    /* 3. Horizontal Scroll Snap Carousel */
+    .filmdb-carousel {{
+        display: flex; gap: 16px; overflow-x: auto; padding: 10px 0 20px 0;
+        scroll-snap-type: x mandatory;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: thin;
+        scrollbar-color: rgba(201, 162, 39, 0.3) transparent;
+    }}
+    .filmdb-carousel::-webkit-scrollbar {{ height: 6px; }}
+    .filmdb-carousel::-webkit-scrollbar-track {{ background: transparent; }}
+    .filmdb-carousel::-webkit-scrollbar-thumb {{ background: rgba(201, 162, 39, 0.3); border-radius: 10px; }}
+    
+    .filmdb-carousel-item {{
+        min-width: 140px; max-width: 140px; flex-shrink: 0;
+        scroll-snap-align: start;
+        border-radius: 10px; overflow: hidden;
+        background: rgba(20, 20, 34, 0.8); border: 1px solid rgba(255, 255, 255, 0.05);
+        transition: transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
+        position: relative;
+    }}
+    .filmdb-carousel-item:hover {{
+        transform: translateY(-5px);
+        border-color: rgba(201, 162, 39, 0.5);
+        box-shadow: 0 10px 20px rgba(0, 0, 0, 0.4), 0 0 15px rgba(201, 162, 39, 0.2);
+    }}
+    .filmdb-carousel-item img {{
+        width: 100%; height: 210px; object-fit: cover; display: block;
+    }}
+    .filmdb-carousel-meta {{
+        padding: 10px; text-align: center;
+    }}
+    .filmdb-carousel-title {{
+        font-size: 0.8rem; font-weight: 600; color: #eaeaea; 
+        margin-bottom: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }}
+    .filmdb-carousel-sub {{
+        font-size: 0.65rem; color: #8e8ea4;
+    }}
+
+    /* 4. Interactive Starter Cards (Targeting Streamlit Buttons) */
+    /* Target the column divs that contain starter cards to make the buttons fill them beautifully */
+    div[data-testid="column"]:has(.filmdb-starter-hook) button[kind="secondary"] {{
+        width: 100% !important;
+        height: 110px !important;
+        background: linear-gradient(145deg, rgba(20, 20, 34, 0.8) 0%, rgba(15, 15, 25, 0.95) 100%) !important;
+        border: 1px solid rgba(255, 255, 255, 0.08) !important;
+        border-radius: 14px !important;
+        padding: 18px 20px !important;
+        text-align: left !important;
+        display: flex !important;
+        flex-direction: column !important;
+        justify-content: space-between !important;
+        transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1) !important;
+        position: relative !important;
+        overflow: hidden !important;
+    }}
+    
+    div[data-testid="column"]:has(.filmdb-starter-hook) button[kind="secondary"] p {{
+        font-size: 0.95rem !important;
+        font-weight: 600 !important;
+        color: #eaeaea !important;
+        white-space: normal !important;
+        line-height: 1.4 !important;
+        margin: 0 !important;
+    }}
+
+    div[data-testid="column"]:has(.filmdb-starter-hook) button[kind="secondary"]:hover {{
+        border-color: rgba(201, 162, 39, 0.6) !important;
+        transform: translateY(-3px) !important;
+        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4), 0 0 15px rgba(201, 162, 39, 0.15) !important;
+    }}
+
+    /* Add animated glowing border effect on hover using pseudoelements */
+    div[data-testid="column"]:has(.filmdb-starter-hook) button[kind="secondary"]::after {{
+        content: ""; position: absolute; top: 0; left: -100%; width: 50%; height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.05), transparent);
+        transform: skewX(-20deg); transition: 0s;
+    }}
+    div[data-testid="column"]:has(.filmdb-starter-hook) button[kind="secondary"]:hover::after {{
+        left: 200%; transition: 0.7s ease-in-out;
+    }}
+
+    /* 5. Download Card Pulse Animation */
+    @keyframes downloadPulse {{
+        0% {{ box-shadow: 0 0 0 0 rgba(201, 162, 39, 0.4); }}
+        70% {{ box-shadow: 0 0 0 10px rgba(201, 162, 39, 0); }}
+        100% {{ box-shadow: 0 0 0 0 rgba(201, 162, 39, 0); }}
+    }}
+    .filmdb-download-card {{
+        background: rgba(26, 26, 46, 0.9);
+        border: 1px solid rgba(201, 162, 39, 0.4);
+        border-radius: 12px; padding: 16px 20px; margin-top: 15px;
+        display: flex; align-items: center; gap: 16px;
+        animation: downloadPulse 2.5s infinite;
+        transition: transform 0.2s ease;
+    }}
+    .filmdb-download-card:hover {{
+        transform: scale(1.01);
+    }}
+    .filmdb-download-btn {{
+        background: linear-gradient(135deg, #c9a227, #d4a017);
+        color: #0d0d0d !important; padding: 10px 20px; border-radius: 8px;
+        font-weight: 700; font-size: 0.9rem; text-decoration: none !important;
+        transition: all 0.2s ease; display: inline-block;
+        box-shadow: 0 4px 15px rgba(201, 162, 39, 0.3);
+    }}
+    .filmdb-download-btn:hover {{
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(201, 162, 39, 0.5);
+        color: #000 !important;
+    }}
+
+    /* 6. Staggered Fade-In Animations */
+    @keyframes staggerFadeIn {{
+        from {{ opacity: 0; transform: translateY(15px); }}
+        to {{ opacity: 1; transform: translateY(0); }}
+    }}
+    .filmdb-stagger-item {{
+        opacity: 0;
+        animation: staggerFadeIn 0.5s cubic-bezier(0.25, 0.8, 0.25, 1) forwards;
+    }}
+
     /* ═══════════════════  MISC  ═══════════════════ */
     .stAlert {{ border-radius: {RADIUS_SM} !important; }}
     div[data-testid="stImage"] {{ border-radius: {RADIUS_SM}; overflow: hidden; }}

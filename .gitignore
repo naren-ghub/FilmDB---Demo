@@ -50,9 +50,30 @@ test_resolver.py
 ui/.filmdb_users.json
 rag/kaagle/
 rag/crawlers/
-rag/data/
+rag/data
+rag/ingest
+rag/books
 production_crawler_log.txt
 crawler_test_log.txt
 production_crawl_log.txt
 all_books_list.json
 audit_sorted.json
+
+# ChromaDB vector store — 2.2 GB of binary HNSW indices, regenerate with embed scripts
+rag/chromadb_store/
+
+# Temporary files from embedding pipeline
+tmp_centroids.json
+
+tmp/
+.filmdb_last_user.json
+agent_report/
+docs/
+scripts/
+
+
+
+2.html
+overview.html
+domain_scores.txt
+final_intent_pipeline_results.txt

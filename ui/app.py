@@ -61,6 +61,14 @@ def _try_auto_login() -> None:
         saved_sessions = get_chat_sessions(username)
         if saved_sessions:
             st.session_state.chat_sessions = saved_sessions
+            
+            # Auto-restore the most recent session if we just logged in or refreshed
+            if not st.session_state.messages:
+                # get_chat_sessions_db returns ordered by created_at DESC
+                most_recent_sid = next(iter(saved_sessions.keys()), None)
+                if most_recent_sid:
+                    from utils.state import restore_chat_session
+                    restore_chat_session(most_recent_sid)
 
 
 def main() -> None:

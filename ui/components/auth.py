@@ -16,6 +16,7 @@ from utils.persistence import (
     register_user_ui,
     save_profile,
     user_exists,
+    set_last_active_user,
 )
 
 
@@ -24,9 +25,9 @@ def show_login_modal() -> None:
     # Hide sidebar during auth and adjust padding
     st.markdown(
         """<style>
-        section[data-testid='stSidebar']{display:none !important;}
-        .block-container{padding-top:0 !important; padding-bottom:0 !important;}
-        </style>""",
+section[data-testid='stSidebar']{display:none !important;}
+.block-container{padding-top:0 !important; padding-bottom:0 !important;}
+</style>""",
         unsafe_allow_html=True,
     )
 
@@ -36,10 +37,10 @@ def show_login_modal() -> None:
     with centre:
         st.markdown(
             """
-            <div class='filmdb-auth-card'>
-                <h2>🍿 FilmDB <span style='font-size:0.5em;color:#6c6c80;'>DEMO</span></h2>
-                <p class='subtitle'>Your personal cinematic intelligence</p>
-            </div>
+<div class='filmdb-auth-card'>
+<h2>🍿 FilmDB <span style='font-size:0.5em;color:#6c6c80;'>DEMO</span></h2>
+<p class='subtitle'>Your personal cinematic intelligence</p>
+</div>
             """,
             unsafe_allow_html=True,
         )
@@ -115,6 +116,7 @@ def _login_user(username: str) -> None:
     if saved_sessions:
         st.session_state.chat_sessions = saved_sessions
 
+    set_last_active_user(username)
     st.rerun()
 
 
@@ -145,11 +147,20 @@ def show_personalization_modal() -> None:
 
     st.markdown("<div style='height:4vh;'></div>", unsafe_allow_html=True)
 
+    profile = st.session_state.get("user_profile", {})
+    curr_region = profile.get("region", "India")
+    curr_genres = [g for g in profile.get("genres", []) if g in _GENRES]
+    curr_platforms = [p for p in profile.get("platforms", []) if p in _PLATFORMS]
+    curr_fav_movies = ", ".join(profile.get("fav_movies", []))
+    curr_fav_actors = ", ".join(profile.get("fav_actors", []))
+    curr_fav_directors = ", ".join(profile.get("fav_directors", []))
+
     _c, centre, _c2 = st.columns([0.8, 2, 0.8])
     with centre:
+        title = "Edit Your Profile" if profile else "Set Up Your Profile"
         st.markdown(
             "<div class='filmdb-profile-card'>"
-            "<h2 style='text-align:center;margin-bottom:.2rem;'>🎬 Set Up Your Profile</h2>"
+            f"<h2 style='text-align:center;margin-bottom:.2rem;'>🎬 {title}</h2>"
             "<p class='subtitle' style='text-align:center;'>Tell us what you love so we can personalise your experience</p>"
             "</div>",
             unsafe_allow_html=True,
@@ -157,12 +168,14 @@ def show_personalization_modal() -> None:
 
         with st.form("profile_form", clear_on_submit=False):
             st.markdown("##### 🌍 Region")
-            region = st.selectbox("Where are you based?", _REGIONS, label_visibility="collapsed")
+            region_idx = _REGIONS.index(curr_region) if curr_region in _REGIONS else 0
+            region = st.selectbox("Where are you based?", _REGIONS, index=region_idx, label_visibility="collapsed")
 
             st.markdown("##### 🎭 Favourite Genres")
             genres = st.multiselect(
                 "Pick at least 3 genres you enjoy",
                 _GENRES,
+                default=curr_genres,
                 label_visibility="collapsed",
             )
 
@@ -170,20 +183,24 @@ def show_personalization_modal() -> None:
             platforms = st.multiselect(
                 "Select the platforms you subscribe to",
                 _PLATFORMS,
+                default=curr_platforms,
                 label_visibility="collapsed",
             )
 
             st.markdown("##### ⭐ Favourites")
             fav_movies = st.text_input(
                 "Favourite movies (comma-separated, ≥1)",
+                value=curr_fav_movies,
                 placeholder="e.g. Inception, Interstellar",
             )
             fav_actors = st.text_input(
                 "Favourite actors / actresses (≥1)",
+                value=curr_fav_actors,
                 placeholder="e.g. Keanu Reeves, Saoirse Ronan",
             )
             fav_directors = st.text_input(
                 "Favourite directors (≥1)",
+                value=curr_fav_directors,
                 placeholder="e.g. Christopher Nolan, Denis Villeneuve",
             )
 

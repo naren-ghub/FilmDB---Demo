@@ -18,45 +18,85 @@ def md_to_html(text: str) -> str:
     if not text:
         return ""
 
-    # Escape raw HTML first
-    text = _html.escape(text)
+    # Escape raw HTML first.
+    raw = _html.escape(text)
 
-    # Headings  (### → <h4>, ## → <h3>, # → <h2>)
-    text = re.sub(r"^### (.+)$", r"<h5>\1</h5>", text, flags=re.MULTILINE)
-    text = re.sub(r"^## (.+)$",  r"<h4>\1</h4>", text, flags=re.MULTILINE)
-    text = re.sub(r"^# (.+)$",   r"<h3>\1</h3>", text, flags=re.MULTILINE)
+    # Code fences first to avoid accidental formatting inside.
+    raw = re.sub(
+        r"```(\w+)?\n([\s\S]*?)```",
+        lambda m: f"<pre><code class='lang-{(m.group(1) or '').strip()}'>{m.group(2).strip()}</code></pre>",
+        raw,
+    )
 
-    # Bold + italic
-    text = re.sub(r"\*\*\*(.+?)\*\*\*", r"<strong><em>\1</em></strong>", text)
-    text = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", text)
-    text = re.sub(r"\*(.+?)\*", r"<em>\1</em>", text)
+    # Horizontal rules.
+    raw = re.sub(r"^\s*---+\s*$", "<hr>", raw, flags=re.MULTILINE)
 
-    # Inline code
-    text = re.sub(r"`([^`]+)`", r"<code>\1</code>", text)
+    # Headings (# to ### only, mapped to h3-h5).
+    raw = re.sub(r"^### (.+)$", r"<h5>\1</h5>", raw, flags=re.MULTILINE)
+    raw = re.sub(r"^## (.+)$", r"<h4>\1</h4>", raw, flags=re.MULTILINE)
+    raw = re.sub(r"^# (.+)$", r"<h3>\1</h3>", raw, flags=re.MULTILINE)
 
-    # Links  [text](url)
-    text = re.sub(
+    # Blockquotes.
+    raw = re.sub(
+        r"^&gt;\s?(.+)$",
+        r"<blockquote>\1</blockquote>",
+        raw,
+        flags=re.MULTILINE,
+    )
+
+    # Links.
+    raw = re.sub(
         r"\[([^\]]+)\]\(([^)]+)\)",
         r'<a href="\2" target="_blank" rel="noopener">\1</a>',
-        text,
+        raw,
     )
 
-    # Unordered list items  (- or *)
-    text = re.sub(r"^[\-\*]\s+(.+)$", r"<li>\1</li>", text, flags=re.MULTILINE)
+    # Emphasis.
+    raw = re.sub(r"\*\*\*(.+?)\*\*\*", r"<strong><em>\1</em></strong>", raw)
+    raw = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", raw)
+    raw = re.sub(r"\*(.+?)\*", r"<em>\1</em>", raw)
 
-    # Ordered list items  (1. 2. …)
-    text = re.sub(r"^\d+\.\s+(.+)$", r"<li>\1</li>", text, flags=re.MULTILINE)
+    # Inline code.
+    raw = re.sub(r"`([^`]+)`", r"<code>\1</code>", raw)
 
-    # Wrap consecutive <li> in <ul>
-    text = re.sub(
-        r"((?:<li>.+?</li>\n?)+)",
-        r"<ul>\1</ul>",
-        text,
-    )
+    # Lists.
+    raw = re.sub(r"^\s*[\-\*]\s+(.+)$", r"<li>\1</li>", raw, flags=re.MULTILINE)
+    raw = re.sub(r"^\s*\d+\.\s+(.+)$", r"<li>\1</li>", raw, flags=re.MULTILINE)
+    raw = re.sub(r"((?:<li>.+?</li>\n?)+)", r"<ul>\1</ul>", raw)
 
-    # Paragraphs – double newlines
-    text = re.sub(r"\n{2,}", "</p><p>", text)
-    # Single newlines → <br>
-    text = text.replace("\n", "<br>")
+    # Simple pipe table support.
+    lines = raw.splitlines()
+    rendered: list[str] = []
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        if "|" in line and i + 1 < len(lines):
+            sep = lines[i + 1].strip()
+            if re.match(r"^\s*\|?[-:\s|]+\|?\s*$", sep):
+                headers = [c.strip() for c in line.strip().strip("|").split("|")]
+                rows: list[list[str]] = []
+                i += 2
+                while i < len(lines) and "|" in lines[i]:
+                    rows.append([c.strip() for c in lines[i].strip().strip("|").split("|")])
+                    i += 1
+                thead = "".join(f"<th>{h}</th>" for h in headers)
+                body_rows = []
+                for row in rows:
+                    cells = "".join(f"<td>{c}</td>" for c in row)
+                    body_rows.append(f"<tr>{cells}</tr>")
+                rendered.append(
+                    "<table><thead><tr>"
+                    + thead
+                    + "</tr></thead><tbody>"
+                    + "".join(body_rows)
+                    + "</tbody></table>"
+                )
+                continue
+        rendered.append(line)
+        i += 1
+    raw = "\n".join(rendered)
 
-    return f"<p>{text}</p>"
+    # Paragraphs.
+    raw = re.sub(r"\n{2,}", "</p><p>", raw)
+    raw = raw.replace("\n", "<br>")
+    return f"<p>{raw}</p>"

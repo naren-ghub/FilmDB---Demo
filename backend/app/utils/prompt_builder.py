@@ -1,3 +1,9 @@
+"""
+FilmDB – Prompt Builder
+========================
+Builds structured prompt components for the LLM.
+Returns (system_prompt, user_prompt, context_messages) for proper role separation.
+"""
 
 
 def build_prompt(
@@ -6,9 +12,15 @@ def build_prompt(
     recent_messages: list[dict[str, str]],
     tool_summaries: list[str],
     user_query: str,
-) -> str:
-    sections = []
-    sections.append("SYSTEM:\n" + system_instructions.strip())
+) -> tuple[str, str, list[dict[str, str]]]:
+    """
+    Build structured prompt components for generate_response().
+
+    Returns:
+        (system_prompt, user_prompt, context_messages)
+    """
+    # ── System prompt (role="system") ──
+    system_parts = [system_instructions.strip()]
 
     if user_profile:
         profile_lines = []
@@ -17,20 +29,36 @@ def build_prompt(
                 continue
             profile_lines.append(f"- {key}: {value}")
         if profile_lines:
-            sections.append("USER PROFILE:\n" + "\n".join(profile_lines))
+            system_parts.append(
+                "USER CONTEXT (for personalization only, "
+                "do not let this bias factual answers):\n"
+                + "\n".join(profile_lines)
+            )
 
+    system_prompt = "\n\n".join(system_parts)
+
+    # ── Context messages (role="user"/"assistant" pairs) ──
+    context_messages: list[dict[str, str]] = []
     if recent_messages:
-        convo_lines = []
         for msg in recent_messages:
-            role = msg.get("role")
-            content = msg.get("content")
-            convo_lines.append(f"{role}: {content}")
-        sections.append("RECENT CONVERSATION:\n" + "\n".join(convo_lines))
+            role = msg.get("role", "user")
+            content = msg.get("content", "")
+            if role in ("user", "assistant") and content:
+                context_messages.append({"role": role, "content": content})
+
+    # ── User prompt (role="user") ──
+    user_parts = []
 
     if tool_summaries:
-        wrapped = [f"[TOOL_DATA] {summary} [/TOOL_DATA]" for summary in tool_summaries]
-        sections.append("TOOL DATA:\n" + "\n".join(wrapped))
+        # Filter out empty / not_found tool results
+        useful = [s for s in tool_summaries if s and "not_found" not in s.lower()[:40]]
+        if useful:
+            wrapped = [f"[TOOL: {s.split(':')[0].strip() if ':' in s else 'data'}]\n{s}\n[/TOOL]"
+                        for s in useful]
+            user_parts.append("REFERENCE DATA (use these facts as ground truth):\n"
+                              + "\n".join(wrapped))
 
-    sections.append("USER QUERY:\n" + user_query.strip())
+    user_parts.append(user_query.strip())
+    user_prompt = "\n\n".join(user_parts)
 
-    return "\n\n".join(sections)
+    return system_prompt, user_prompt, context_messages

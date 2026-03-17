@@ -1,12 +1,46 @@
+import math
 
 
+import pandas as pd
+import numpy as np
+
+def _sanitize_json(obj):
+    """Recursively convert NaN/Infinity floats to None for JSON compliance.
+    
+    Handles: Python float NaN/Inf, numpy float/int/bool, pandas NA/NaT.
+    """
+    if isinstance(obj, dict):
+        return {k: _sanitize_json(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [_sanitize_json(v) for v in obj]
+    # numpy types
+    if isinstance(obj, np.floating):
+        if np.isnan(obj) or np.isinf(obj):
+            return None
+        return float(obj)
+    if isinstance(obj, np.integer):
+        return int(obj)
+    if isinstance(obj, np.bool_):
+        return bool(obj)
+    # Python float
+    if isinstance(obj, float):
+        if math.isnan(obj) or math.isinf(obj):
+            return None
+        return obj
+    # Pandas scalar NA / NaT (check AFTER dict/list/float to avoid ValueError)
+    try:
+        if pd.isna(obj):
+            return None
+    except (ValueError, TypeError):
+        pass
+    return obj
 
 def normalize_tool_output(status: str, data: dict) -> dict:
     if status not in ("success", "not_found", "error", "disambiguation"):
         status = "error"
     if data is None:
         data = {}
-    return {"status": status, "data": data}
+    return {"status": status, "data": _sanitize_json(data)}
 
 
 def summarize_tool_data(tool_name: str, output: dict) -> str:
@@ -96,15 +130,13 @@ def summarize_tool_data(tool_name: str, output: dict) -> str:
         plot = data.get("plot_text", "")
         return f"source: {tool_name} title: {title} plot: {str(plot)[:300]}"
 
-    if logical_name == "kb_critic":
-        title = data.get("title", "")
-        count = data.get("review_count", 0)
-        sentiments = data.get("sentiment_breakdown", {})
-        reviews = data.get("reviews", [])
-        review_texts = [r.get("review_text", "")[:100] for r in reviews[:5]]
-        parts = [f"source: {tool_name} title: {title} review_count: {count} sentiments: {sentiments}"]
-        for i, rt in enumerate(review_texts):
-            parts.append(f"review_{i+1}: {rt}")
+    if logical_name == "rag_essays":
+        passages = data.get("passages", [])
+        parts = [f"source: {tool_name} passage_count: {len(passages)}"]
+        for i, p in enumerate(passages[:4]):
+            entity = p.get("entity_name") or p.get("title") or "unknown"
+            snippet = p.get("passage", "")[:250].replace("\n", " ")
+            parts.append(f"essay_{i+1}: [{entity}] {snippet}")
         return " | ".join(parts)
 
     if logical_name == "kb_similarity":
@@ -149,18 +181,13 @@ def summarize_tool_data(tool_name: str, output: dict) -> str:
             f"movie_b: {b.get('title')} ({b.get('year')}) rating: {b.get('imdb_rating')}"
         )
 
-    if logical_name == "kb_film_analysis":
-        articles = data.get("articles", [])
-        count = data.get("article_count", 0)
-        parts = [f"source: {tool_name} article_count: {count}"]
-        for i, art in enumerate(articles[:3]):
-            source = art.get("source", "?")
-            title = art.get("title") or "untitled"
-            chunks = art.get("analysis_chunks", [])
-            chunk_text = " ".join(chunks[:2])[:300] if chunks else ""
-            parts.append(
-                f"article_{i+1}: [{source}] {title} | analysis: {chunk_text}"
-            )
+    if logical_name == "rag_scripts":
+        passages = data.get("passages", [])
+        parts = [f"source: {tool_name} passage_count: {len(passages)}"]
+        for i, p in enumerate(passages[:3]):
+            entity = p.get("entity_name") or p.get("title") or "unknown"
+            snippet = p.get("passage", "")[:250].replace("\n", " ")
+            parts.append(f"script_{i+1}: [{entity}] {snippet}")
         return " | ".join(parts)
 
     if logical_name == "cinema_search":

@@ -4,11 +4,9 @@
 from app.services.kb_service import (
     kb_entity_lookup,
     kb_plot_analysis,
-    kb_critic_review,
     kb_movie_similarity,
     kb_top_rated,
     kb_person_filmography,
-    kb_movie_comparison,
-    kb_film_analysis,
+    kb_compare,
     kb_awards,
 )
