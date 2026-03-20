@@ -77,3 +77,9 @@ scripts/
 overview.html
 domain_scores.txt
 final_intent_pipeline_results.txt
+backend/start_dev.bat
+backend/requirements.txt
+backend/start_dev.ps1
+backend/uvicorn.toml
+backend/tests/
+backend/tests
