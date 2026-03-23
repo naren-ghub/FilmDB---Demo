@@ -10,3 +10,7 @@ ruff
 mypy
 httpx
 huggingface_hub
+youtube-transcript-api
+trafilatura
+BeautifulSoup4
+

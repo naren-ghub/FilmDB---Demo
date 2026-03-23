@@ -185,6 +185,7 @@ async def run(title: str, year: str | int | None = None) -> dict:
     return normalize_tool_output("success", data)
 
 
+
 async def get_person(name: str) -> dict:
     """Search for a person (actor/director) and return their details."""
     if not settings.TMDB_API_KEY:
@@ -217,30 +218,54 @@ async def get_person(name: str) -> dict:
             logger.error(f"TMDB person lookup failed for '{clean_name}': {e}")
             return normalize_tool_output("error", {"name": clean_name, "reason": str(e)})
 
-    # Known for movies
+    # Enhanced Filmography: Categorize by Role
     movie_credits = details.get("movie_credits", {})
-    known_for_cast = sorted(
-        (movie_credits.get("cast") or []),
-        key=lambda x: x.get("vote_count", 0),
-        reverse=True,
-    )
-    known_for_crew = sorted(
-        (movie_credits.get("crew") or []),
-        key=lambda x: x.get("vote_count", 0),
-        reverse=True,
-    )
+    cast_credits = movie_credits.get("cast") or []
+    crew_credits = movie_credits.get("crew") or []
 
-    filmography = []
+    gender = details.get("gender") # 1=female, 2=male
+    actor_role = "actress" if gender == 1 else "actor"
+
+    filmography_by_role = {}
+    
+    # Process Cast
+    for c in cast_credits:
+        role = actor_role
+        if role not in filmography_by_role: filmography_by_role[role] = []
+        filmography_by_role[role].append({
+            "title": c.get("title"),
+            "year": (c.get("release_date") or "")[:4],
+            "character": c.get("character"),
+            "rating": round(c.get("vote_average", 0), 1),
+            "vote_count": c.get("vote_count", 0),
+            "tmdb_id": c.get("id")
+        })
+
+    # Process Crew
+    for c in crew_credits:
+        job = (c.get("job") or "unknown").lower()
+        if job not in filmography_by_role: filmography_by_role[job] = []
+        filmography_by_role[job].append({
+            "title": c.get("title"),
+            "year": (c.get("release_date") or "")[:4],
+            "rating": round(c.get("vote_average", 0), 1),
+            "vote_count": c.get("vote_count", 0),
+            "tmdb_id": c.get("id")
+        })
+
+    # Sort each role by year descending
+    for role in filmography_by_role:
+        filmography_by_role[role].sort(key=lambda x: (x["year"] or "0", x["vote_count"]), reverse=True)
+
+    # Simple flat filmography for backward compatibility and LLM summary
+    flat_list = []
     seen = set()
-    for movie in known_for_cast[:15]:
-        t = movie.get("title")
+    # Prioritize popular ones for the flat list
+    all_credits = sorted(cast_credits + crew_credits, key=lambda x: x.get("vote_count", 0), reverse=True)
+    for c in all_credits[:25]:
+        t = c.get("title")
         if t and t not in seen:
-            filmography.append(t)
-            seen.add(t)
-    for movie in known_for_crew[:10]:
-        t = movie.get("title")
-        if t and t not in seen:
-            filmography.append(t)
+            flat_list.append(t)
             seen.add(t)
 
     profile_path = details.get("profile_path")
@@ -252,8 +277,9 @@ async def get_person(name: str) -> dict:
         "death_date": details.get("deathday"),
         "profession": details.get("known_for_department"),
         "biography": (details.get("biography") or "")[:600],
-        "known_for": filmography[:10],
-        "filmography": filmography,
+        "known_for": flat_list[:10],
+        "filmography": flat_list,
+        "filmography_by_role": filmography_by_role,
         "poster_url": poster_url,
         "tmdb_id": person_id,
         "imdb_id": details.get("imdb_id"),

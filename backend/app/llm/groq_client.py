@@ -28,6 +28,7 @@ class GroqClient:
         self.last_planner_raw: str = ""
         self.last_intent_raw: str = ""
         self.total_calls: int = 0
+        self.last_usage: Any | None = None
 
     @staticmethod
     def _strip_think_tags(text: str) -> str:
@@ -60,24 +61,24 @@ class GroqClient:
     # NOTE: Increased significantly (+1000) to account for Qwen's internal reasoning blocks.
     _MAX_TOKENS_BY_INTENT: dict[str, int] = {
         "GREETING": 1200,
-        "GENERAL_CONVERSATION": 1500,
+        "GENERAL_CONVERSATION": 1000,
         "ENTITY_LOOKUP": 1600,
         "PERSON_LOOKUP": 1700,
-        "FILMOGRAPHY": 1800,
+        "FILMOGRAPHY": 2000,
         "STREAMING_AVAILABILITY": 1400,
         "RECOMMENDATION": 1700,
-        "COMPARISON": 1900,
-        "FILM_ANALYSIS": 2200,
-        "ANALYSIS_TEXT": 2200,
-        "CONCEPTUAL_EXPLANATION": 2000,
-        "THEORETICAL_ANALYSIS": 2000,
-        "MOVEMENT_OVERVIEW": 2000,
-        "VISUAL_ANALYSIS": 1900,
-        "HISTORICAL_CONTEXT": 1900,
-        "DIRECTOR_ANALYSIS": 1900,
+        "COMPARISON": 2800,
+        "FILM_ANALYSIS": 2800,
+        "ANALYSIS_TEXT": 2800,
+        "CONCEPTUAL_EXPLANATION": 2500,
+        "THEORETICAL_ANALYSIS": 2500,
+        "MOVEMENT_OVERVIEW": 2500,
+        "VISUAL_ANALYSIS": 2400,
+        "HISTORICAL_CONTEXT": 2400,
+        "DIRECTOR_ANALYSIS": 2400,
         "CRITIC_REVIEW": 1800,
         "PLOT_EXPLANATION": 1700,
-        "AWARD_LOOKUP": 1500,
+        "AWARD_LOOKUP": 2000,
         "TOP_RATED": 1600,
         "TRENDING": 1600,
         "DOWNLOAD": 1300,
@@ -117,6 +118,9 @@ class GroqClient:
             response = self.client.chat.completions.create(**kwargs)
             self.total_calls += 1
             content = response.choices[0].message.content or ""
+            
+            # Phase 10: Capture usage metrics
+            self.last_usage = getattr(response, "usage", None)
 
             # Log reasoning traces (non-blocking)
             think_content = self._extract_think_tags(content)
@@ -127,6 +131,7 @@ class GroqClient:
             return self._strip_think_tags(content)
         except Exception as exc:
             logging.exception("Groq request failed: %s", exc)
+            self.last_usage = None
             return ""
 
     def propose_tools(self, system_prompt: str, user_prompt: str) -> dict[str, Any]:

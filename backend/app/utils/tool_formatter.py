@@ -83,7 +83,39 @@ def summarize_tool_data(tool_name: str, output: dict) -> str:
         return " | ".join(parts)
     if logical_name == "wikipedia":
         summary = data.get("summary", "")
-        return f"source: {tool_name} summary: {summary[:180]}"
+        meta = data.get("metadata", {})
+        sections = data.get("structured_sections", {})
+        
+        parts = [f"source: {tool_name} title: {data.get('title')}"]
+        parts.append(f"introduction: {summary[:350]}...")
+        
+        # 1. Surface Available Sections
+        if sections:
+            parts.append(f"available_sections: {', '.join(sections.keys())}")
+            
+            # 2. Surface a few more section snippets if small enough
+            important_sections = ["Early life", "Career", "Style", "Legacy", "Reception"]
+            for s_name in important_sections:
+                if s_name in sections:
+                    parts.append(f"{s_name.lower()}_snippet: {sections[s_name][:200]}...")
+            
+        # 3. Surface Awards & Accolades (Priority)
+        awards = sections.get("Awards & Accolades")
+        if awards:
+            parts.append(f"awards_highlights: {awards[:300]}...")
+            
+        # 4. Surface External Connectivity
+        links = meta.get("external_links", {})
+        if links:
+            links_list = [f"{k}: {v}" for k, v in links.items()]
+            parts.append(f"external_links: [{', '.join(links_list)}]")
+            
+        # 5. Surface categories
+        cats = meta.get("categories", [])
+        if cats:
+            parts.append(f"categories: {', '.join(cats[:8])}")
+            
+        return " | ".join(parts)
     if logical_name == "watchmode":
         platforms = data.get("platforms", []) or data.get("providers", [])
         return f"source: {tool_name} platforms: {', '.join(platforms) if platforms else 'none'}"
@@ -111,87 +143,84 @@ def summarize_tool_data(tool_name: str, output: dict) -> str:
             parts.append(f"event: {event} ({' | '.join(event_strs)})")
         return " | ".join(parts)
 
+    if logical_name == "tmdb":
+        if "name" in data:  # Person lookup
+            name = data.get("name")
+            prof = data.get("profession")
+            bio = data.get("biography", "")
+            known = data.get("known_for", [])
+            parts = [f"source: tmdb name: {name} profession: {prof}"]
+            if known:
+                parts.append(f"known_for: {', '.join(known)}")
+            
+            # Add structured filmography snippets
+            by_role = data.get("filmography_by_role", {})
+            if by_role:
+                for role, movies in list(by_role.items())[:4]:
+                    titles = [f"{m['title']} ({m['year']})" for m in movies[:10]]
+                    parts.append(f"{role}: {', '.join(titles)}")
+            
+            if bio:
+                parts.append(f"biography: {bio[:200]}")
+            return " | ".join(parts)
+        else:  # Movie lookup
+            title = data.get("title")
+            year = data.get("year")
+            rating = data.get("rating")
+            director = data.get("director")
+            cast = data.get("cast", [])
+            plot = data.get("plot", "")
+            genres = data.get("genres", [])
+            tagline = data.get("tagline")
+            runtime = data.get("runtime_minutes")
+            
+            parts = [f"source: tmdb title: {title} year: {year} rating: {rating}"]
+            if runtime:
+                parts.append(f"runtime: {runtime} min")
+            if tagline:
+                parts.append(f"tagline: {tagline}")
+            if director:
+                parts.append(f"director: {director}")
+            if cast:
+                parts.append(f"cast: {', '.join(cast[:5])}")
+            if genres:
+                parts.append(f"genres: {', '.join(genres[:5])}")
+            if plot:
+                parts.append(f"overview: {plot[:250]}")
+            return " | ".join(parts)
+
     # ── KB tool summaries ────────────────────────────────────────────────
-    if logical_name == "kb_entity":
-        title = data.get("title")
-        year = data.get("year")
-        rating = data.get("imdb_rating")
-        overview = data.get("overview", "")
-        genres = data.get("genres", "")
-        parts = [f"source: {tool_name} title: {title} year: {year} rating: {rating}"]
-        if genres:
-            parts.append(f"genres: {genres}")
-        if overview:
-            parts.append(f"overview: {str(overview)[:200]}")
-        return " | ".join(parts)
 
-    if logical_name == "kb_plot":
-        title = data.get("title", "")
-        plot = data.get("plot_text", "")
-        return f"source: {tool_name} title: {title} plot: {str(plot)[:300]}"
-
-    if logical_name == "rag_essays":
-        passages = data.get("passages", [])
-        parts = [f"source: {tool_name} passage_count: {len(passages)}"]
-        for i, p in enumerate(passages[:4]):
-            entity = p.get("entity_name") or p.get("title") or "unknown"
-            snippet = p.get("passage", "")[:250].replace("\n", " ")
-            parts.append(f"essay_{i+1}: [{entity}] {snippet}")
-        return " | ".join(parts)
-
-    if logical_name == "kb_similarity":
+    if logical_name == "recommendation_engine":
         recs = data.get("recommendations", [])
-        titles = [r.get("title", "Unknown") for r in recs[:10]]
-        tags = data.get("source_tags", [])
-        return f"source: {tool_name} tags: {', '.join(tags[:5])} recommendations: {', '.join(titles)}"
+        titles = [f"{r.get('title', 'Unknown')} ({r.get('year', '?')})" for r in recs[:10]]
+        return f"source: {tool_name} recommendation_count: {len(recs)} recommendations: {', '.join(titles)}"
 
-    if logical_name == "kb_top_rated":
-        movies = data.get("movies", [])
-        titles = [f"{m.get('title')} ({m.get('rating')})" for m in movies[:10]]
-        filters = data.get("filters", {})
-        return f"source: {tool_name} filters: {filters} movies: {', '.join(titles)}"
-
-    if logical_name == "kb_filmography":
-        name = data.get("name")
-        prof = data.get("professions", "")
-        by_role = data.get("filmography_by_role", {})
-        parts = [f"source: {tool_name} name: {name} profession: {prof}"]
-        role_order = ["director", "writer", "producer", "actor", "actress",
-                      "composer", "cinematographer", "editor", "self",
-                      "archive_footage", "archive_sound"]
-        for role in role_order:
-            entries = by_role.get(role, [])
-            if entries:
-                titles = [f"{f.get('title')} ({f.get('year')}, rating={f.get('rating')})"
-                          for f in entries[:15] if f.get("title")]
-                parts.append(f"{role}: {', '.join(titles)}")
-        # Fallback to flat list if grouped data is missing
-        if not by_role:
-            films = data.get("filmography", [])
-            film_titles = [f"{f.get('title')} ({f.get('year')})" for f in films[:10] if f.get("title")]
-            parts.append(f"films: {', '.join(film_titles)}")
+    if logical_name == "oscar_award":
+        wins = data.get("wins", [])
+        noms = data.get("nominations", [])
+        parts = [f"source: {tool_name} oscar_wins: {len(wins)} oscar_nominations: {len(noms)}"]
+        if wins:
+            win_cats = [w.get("category", "") for w in wins[:5] if isinstance(w, dict)]
+            parts.append(f"wins: {', '.join(win_cats)}")
+        if noms:
+            nom_cats = [n.get("category", "") for n in noms[:5] if isinstance(n, dict)]
+            parts.append(f"nominations: {', '.join(nom_cats)}")
         return " | ".join(parts)
 
-    if logical_name == "kb_comparison":
-        a = data.get("movie_a", {})
-        b = data.get("movie_b", {})
-        return (
-            f"source: {tool_name} "
-            f"movie_a: {a.get('title')} ({a.get('year')}) rating: {a.get('imdb_rating')} | "
-            f"movie_b: {b.get('title')} ({b.get('year')}) rating: {b.get('imdb_rating')}"
-        )
-
-    if logical_name == "rag_scripts":
+    if logical_name == "rag":
         passages = data.get("passages", [])
-        parts = [f"source: {tool_name} passage_count: {len(passages)}"]
-        for i, p in enumerate(passages[:3]):
-            entity = p.get("entity_name") or p.get("title") or "unknown"
+        query_type = data.get("query_type", "")
+        parts = [f"source: rag_unified passage_count: {len(passages)} query_type: {query_type}"]
+        for i, p in enumerate(passages[:7]):
+            label = p.get("context_label") or p.get("entity_name") or p.get("title") or "unknown"
             snippet = p.get("passage", "")[:250].replace("\n", " ")
-            parts.append(f"script_{i+1}: [{entity}] {snippet}")
+            score = p.get("score", 0)
+            parts.append(f"chunk_{i+1}: [{label}] (score:{score:.3f}) {snippet}")
         return " | ".join(parts)
 
     if logical_name == "cinema_search":
-        results = data.get("results", [])[:5]
+        results = data.get("results", [])[:6]
         if not results:
             return f"source: {tool_name} query: {data.get('query', '')} | no results found"
         parts = [f"source: {tool_name} query: {data.get('query', '')}"]
@@ -216,8 +245,6 @@ def summarize_tool_data(tool_name: str, output: dict) -> str:
             
             parts.append(entry)
         return "\n\n".join(parts)
-
-    return f"{tool_name}: ok"
 
     return f"{tool_name}: ok"
 

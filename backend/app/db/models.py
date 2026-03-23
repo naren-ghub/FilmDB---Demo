@@ -120,6 +120,8 @@ class SessionContext(Base):
     last_entity = Column(String)
     entity_type = Column(String)
     last_intent = Column(String)
+    entity_stack = Column(JSON, nullable=True)        # EntityMemory serialized list
+    covered_categories = Column(JSON, nullable=True)  # ["factual", "analysis", ...]
     updated_at = Column(DateTime, default=_now)
 
 
@@ -182,6 +184,14 @@ class RequestLog(Base):
     # ── Metadata ──
     total_time_ms = Column(Integer)
     error = Column(Text)                  # populated if a fatal error occurred
+    
+    # ── Factual Token Usage (Phase 10) ──
+    prompt_tokens = Column(Integer, nullable=True)
+    completion_tokens = Column(Integer, nullable=True)
+    token_breakdown = Column(JSON, nullable=True)        # {system, history, tools: {name: tokens}, user}
+    llm_call_count = Column(Integer, nullable=True)
+    tool_outputs = Column(JSON, nullable=True)           # RAW tool outputs
+    
     created_at = Column(DateTime, default=_now)
 
 
@@ -191,7 +201,9 @@ def init_db() -> None:
     _ensure_user_columns()
     _ensure_user_profile_columns()
     _ensure_request_log_shadow_columns()
+    _ensure_request_log_token_columns()
     _ensure_session_soft_delete_column()
+    _ensure_entity_memory_columns()
 
 
 def _ensure_session_soft_delete_column() -> None:
@@ -279,6 +291,45 @@ def _ensure_request_log_shadow_columns() -> None:
                     conn.exec_driver_sql(
                         f"ALTER TABLE request_logs ADD COLUMN {col} {typ}"
                     )
+            conn.commit()
+        except Exception:
+            pass
+def _ensure_request_log_token_columns() -> None:
+    """Phase 10 — Add factual token tracking columns to request_logs."""
+    if not settings.DATABASE_URL.startswith("sqlite"):
+        return
+    with engine.connect() as conn:
+        try:
+            result = conn.exec_driver_sql("PRAGMA table_info(request_logs)")
+            existing = {row[1] for row in result.fetchall()}
+            for col, typ in [
+                ("prompt_tokens", "INTEGER"),
+                ("completion_tokens", "INTEGER"),
+                ("token_breakdown", "JSON"),
+                ("llm_call_count", "INTEGER"),
+                ("tool_outputs", "JSON"),
+            ]:
+                if col not in existing:
+                    conn.exec_driver_sql(
+                        f"ALTER TABLE request_logs ADD COLUMN {col} {typ}"
+                    )
+            conn.commit()
+        except Exception:
+            pass
+
+
+def _ensure_entity_memory_columns() -> None:
+    """Add entity_stack and covered_categories columns to session_context."""
+    if not settings.DATABASE_URL.startswith("sqlite"):
+        return
+    with engine.connect() as conn:
+        try:
+            result = conn.exec_driver_sql("PRAGMA table_info(session_context)")
+            existing = {row[1] for row in result.fetchall()}
+            if "entity_stack" not in existing:
+                conn.exec_driver_sql("ALTER TABLE session_context ADD COLUMN entity_stack JSON")
+            if "covered_categories" not in existing:
+                conn.exec_driver_sql("ALTER TABLE session_context ADD COLUMN covered_categories JSON")
             conn.commit()
         except Exception:
             pass

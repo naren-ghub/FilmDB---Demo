@@ -70,7 +70,9 @@ Valid intents for this domain:
   TOP_RATED             – top-rated movies (genre/year filter)
   FILMOGRAPHY           – director or actor list of works
   DOWNLOAD              – public domain download request
-  RECOMMENDATION        – movies similar to a given movie, suggestions
+  SIMILARITY            – movies similar to a given movie (e.g., "movies like Inception")
+  GENRE_TOP             – best or top-rated movies in a genre (e.g., "best sci-fi movies")
+  UNDERRATED            – hidden gems, underrated movies, overlooked masterpieces
 
 Schema: {"primary_intent":"...","secondary_intents":[],"entities":[],"confidence":90}
 Entity format: [{"type":"movie"|"person"|"genre"|"year"|"platform","value":"..."}]
@@ -272,15 +274,9 @@ IMPORTANT: Actively detect compound/multi-part questions and confidently populat
 
 Valid intents:
   PRODUCTION_GUIDANCE    – how to make a film, production process
-  SCREENWRITING_HELP     – screenplay structure, story beats, dialogue, adaptation
-  TECHNIQUE_TUTORIAL     – specific craft tutorial (how to write a scene, character arc)
-
-Cross-domain intents (use in secondary_intents when the user also asks for these):
-  ENTITY_LOOKUP           – movie/show details, cast, rating, year
-  PERSON_LOOKUP           – actor/director biography, people info
-  RECOMMENDATION          – movies similar to X, suggest films, similar movies
-  STREAMING_AVAILABILITY  – where to watch, available on which platform
-  DOWNLOAD                – public domain download request
+  SCREENWRITING_HELP     – screenplay structure, story beats, dialogue, adaptation, specific craft tutorial (how to write a scene, character arc)
+  TECHNIQUE_TUTORIAL     – How to direct a movie, how to edit a movie, how to shoot a movie, how to produce a movie, how to write a movie, how to direct a movie, how to edit a movie, how to shoot a movie, how to produce a movie, how to write a movie
+  ACTING_GUIDANCE        – How to act in a movie, how to be an actor, how to be a good actor, how to be a great actor, how to be a method actor, how to be a method actor, how to be a method actor, how to be a method actor, how to be a method actor, how to be a method actor
 
 Schema: {"primary_intent":"...","secondary_intents":[],"entities":[],"confidence":90}
 
@@ -289,6 +285,8 @@ Examples:
 - "how is a documentary made" → {"primary_intent":"PRODUCTION_GUIDANCE","secondary_intents":[],"entities":[],"confidence":88}
 - "how to write a character arc" → {"primary_intent":"TECHNIQUE_TUTORIAL","secondary_intents":[],"entities":[],"confidence":88}
 - "how to write a screenplay and suggest some well-written films" → {"primary_intent":"SCREENWRITING_HELP","secondary_intents":["RECOMMENDATION"],"entities":[],"confidence":88}
+- "how to act in a movie and suggest some good movies to watch" → {"primary_intent":"ACTING_GUIDANCE","secondary_intents":["RECOMMENDATION"],"entities":[],"confidence":88}
+- The Query may contain some books like screenplay foundation by Syd Field, Save the cat by Blake Snyder, Story by Robert McKee, etc... these books give techniques and practices for writing a screenplay, like wise for directing, acting, cinemotography there are many books so choose appropriately
 """
 
 class FilmProductionAgent:
@@ -316,6 +314,46 @@ class GeneralAgent:
         }
 
 
+# 7. Live Search Agent  (live_search domain)
+# ─────────────────────────────────────────────────────────────────────────────
+
+_LIVE_SEARCH_SYSTEM = """
+You are a FilmDB sub-intent classifier for the LIVE SEARCH domain.
+Return STRICT JSON only.
+
+Valid intents:
+  LATEST_NEWS           – latest news, breaking news, recent developments, current status
+  TRENDING              – what's popular now, trending films/people
+  UPCOMING              – movie releases in the near future, dune 3 release, etc.
+  BOX_OFFICE            – commercial performance, collections, profits
+  CRITIC_REVIEW         – recent critical consensus from web sources
+
+Supporting entities:
+  - movie               – name of the film
+  - person              – name of actor/director
+  - region              – "Tamil", "Indian", "Global/Hollywood" (detected from context)
+  - category            – "Awards", "Industry", "Critics"
+
+Schema: {"primary_intent":"...","secondary_intents":[],"entities":[],"confidence":90}
+Entity format: [{"type":"movie"|"person"|"genre"|"region"|"category","value":"..."}]
+
+Examples:
+- "latest news about Nolan" → {"primary_intent":"LATEST_NEWS","secondary_intents":[],"entities":[{"type":"person","value":"Christopher Nolan"},{"type":"region","value":"Global"}],"confidence":98}
+- "Dune 3 release date" → {"primary_intent":"UPCOMING","secondary_intents":[],"entities":[{"type":"movie","value":"Dune 3"},{"type":"region","value":"Global"}],"confidence":98}
+- "is Joker 2 a flop or hit" → {"primary_intent":"BOX_OFFICE","secondary_intents":["CRITIC_REVIEW"],"entities":[{"type":"movie","value":"Joker 2"},{"type":"category","value":"Industry"}],"confidence":95}
+- "Ajith health updates" → {"primary_intent":"LATEST_NEWS","secondary_intents":[],"entities":[{"type":"person","value":"Ajith Kumar"},{"type":"region","value":"Tamil"}],"confidence":98}
+- "Oscar 2026 winners" → {"primary_intent":"AWARD_LOOKUP","secondary_intents":[],"entities":[{"type":"category","value":"Awards"}],"confidence":98}
+"""
+
+class LiveSearchAgent:
+    def classify(self, message: str, llm) -> dict:
+        user = f"User message: {message}\nReturn JSON only."
+        result = _parse_json(llm.intent_classify(_LIVE_SEARCH_SYSTEM, user),
+                             _base_default("LATEST_NEWS"))
+        result.setdefault("domain", "live_search")
+        return result
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Registry
 # ─────────────────────────────────────────────────────────────────────────────
@@ -327,5 +365,6 @@ DOMAIN_AGENTS: dict[str, object] = {
     "film_history":    FilmHistoryAgent(),
     "film_aesthetics": FilmAestheticsAgent(),
     "film_production": FilmProductionAgent(),
+    "live_search":     LiveSearchAgent(),
     "general":         GeneralAgent(),
 }

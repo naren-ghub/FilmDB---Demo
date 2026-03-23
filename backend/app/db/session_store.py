@@ -116,6 +116,8 @@ def upsert_session_context(
     last_entity: str | None,
     entity_type: str | None,
     last_intent: str | None,
+    entity_stack: list | str | None = None,
+    covered_categories: list | str | None = None,
 ) -> SessionContext:
     ctx = db.query(SessionContext).filter(SessionContext.session_id == session_id).first()
     if ctx:
@@ -124,6 +126,10 @@ def upsert_session_context(
         cast(Any, ctx).last_entity = last_entity
         cast(Any, ctx).entity_type = entity_type
         cast(Any, ctx).last_intent = last_intent
+        if entity_stack is not None:
+            cast(Any, ctx).entity_stack = entity_stack
+        if covered_categories is not None:
+            cast(Any, ctx).covered_categories = covered_categories
         cast(Any, ctx).updated_at = datetime.utcnow()
     else:
         ctx = SessionContext(
@@ -133,6 +139,8 @@ def upsert_session_context(
             last_entity=last_entity,
             entity_type=entity_type,
             last_intent=last_intent,
+            entity_stack=entity_stack,
+            covered_categories=covered_categories,
             updated_at=datetime.utcnow(),
         )
         db.add(ctx)
@@ -373,7 +381,16 @@ def hard_delete_expired_sessions_db(db: Session) -> int:
 
 # ─────────── Request Trace Logging ────────────────────────────────────────────
 
-def log_request(trace: Dict[str, Any], response: Dict[str, Any], total_time_ms: int = 0) -> None:
+def log_request(
+    trace: Dict[str, Any], 
+    response: Dict[str, Any], 
+    total_time_ms: int = 0,
+    prompt_tokens: int | None = None,
+    completion_tokens: int | None = None,
+    token_breakdown: Dict[str, Any] | None = None,
+    llm_call_count: int | None = None,
+    tool_outputs: Dict[str, Any] | None = None
+) -> None:
     """Persist the full query-to-response trace to the request_logs table."""
     db = SessionLocal()
     try:
@@ -413,6 +430,12 @@ def log_request(trace: Dict[str, Any], response: Dict[str, Any], total_time_ms: 
             shadow_domain=shadow.get("domain"),
             shadow_intent=shadow.get("intent"),
             shadow_confidence=shadow.get("confidence"),
+            # Factual Tokens (Phase 10)
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+            token_breakdown=token_breakdown,
+            llm_call_count=llm_call_count,
+            tool_outputs=tool_outputs,
             created_at=datetime.utcnow(),
         )
         db.add(entry)

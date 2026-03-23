@@ -32,74 +32,42 @@ TOOL_REGISTRY = {
 
     "imdb_awards": {
         "name": "imdb_awards",
-        "description": "IMDb awards and nominations for a movie",
+        "description": "IMDb awards and nominations (all ceremonies) for a movie or person. Use for AWARD_LOOKUP, OSCAR_LOOKUP.",
+        "intent_group": "award_lookup",
         "required": [],
     },
 
     # ── KB-powered tools ─────────────────────────────────────────────
-    "kb_entity": {
-        "name": "kb_entity",
-        "description": "KB movie entity lookup (local data)",
-        "required": ["title"],
+    "recommendation_engine": {
+        "name": "recommendation_engine",
+        "description": "Query-aware local movie recommendations (Collaborative & Ranking). Use for 'similar to', 'best of genre', or 'underrated' queries.",
+        "required": ["query"],
     },
-    "kb_plot": {
-        "name": "kb_plot",
-        "description": "KB Wikipedia plot retrieval",
-        "required": ["title"],
-    },
-    "kb_similarity": {
-        "name": "kb_similarity",
-        "description": "KB tag-based movie similarity",
-        "required": ["title"],
-    },
-    "kb_top_rated": {
-        "name": "kb_top_rated",
-        "description": "KB top rated movies (genre/year/language filters)",
+    "oscar_award": {
+        "name": "oscar_award",
+        "description": "Local Academy Awards (Oscar) nominations and wins for a movie or person. Use for AWARD_LOOKUP, OSCAR_LOOKUP.",
+        "intent_group": "award_lookup",
         "required": [],
     },
-    "kb_filmography": {
-        "name": "kb_filmography",
-        "description": "KB person filmography lookup",
-        "required": ["name"],
-    },
-    "kb_comparison": {
-        "name": "kb_comparison",
-        "description": "KB side-by-side movie comparison",
-        "required": ["title_a", "title_b"],
-    },
-    "kb_awards": {
-        "name": "kb_awards",
-        "description": "KB local Oscar nominations and wins for a movie or person",
-        "required": [],
-    },
-
-    # ── Semantic RAG tools ─────────────────────────────────────────────
-    "rag_essays": {
-        "name": "rag_essays",
+    "rag": {
+        "name": "rag",
         "description": (
-            "Semantic RAG retrieval over film analysis essays (Senses of Cinema, BFI). "
-            "Use for questions about directors, cinematic style, critical significance, "
-            "film appreciation, and 'why is X great' queries."
+            "Unified semantic RAG retrieval over film analysis essays, cinema books (theory, criticism, "
+            "history, aesthetics, production, scripts), and movie plots using ChromaDB + cross-encoder re-ranking. "
+            "Use for conceptual questions, analytical deep-dives, directors' style, film movements, "
+            "visual aesthetics, production techniques, screenplay analysis, and plot narrative context."
         ),
         "required": ["query"],
     },
-    "rag_books": {
-        "name": "rag_books",
-        "description": (
-            "Semantic RAG retrieval over 318 classified cinema books "
-            "(film theory, criticism, history, aesthetics, production, scripts). "
-            "Use for conceptual questions, theoretical analysis, techniques, and historical context."
-        ),
-        "required": ["query", "domain"],  # domain: film_theory|film_criticism|film_history|film_aesthetics|film_production|scripts
-    },
-    "rag_scripts": {
-        "name": "rag_scripts",
-        "description": (
-            "Semantic RAG retrieval over movie screenplays and scripts. "
-            "Use when the user asks about dialogue, scenes, or script structure "
-            "for a specific movie or person."
-        ),
+    "cinema_search": {
+        "name": "cinema_search",
+        "description": "Live web search for latest movie news, trends, reviews",
         "required": ["query"],
+    },
+    "tmdb": {
+        "name": "tmdb",
+        "description": "TMDB API for movie details and person info",
+        "required": [],
     },
 }
 

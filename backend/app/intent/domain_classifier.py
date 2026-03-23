@@ -13,7 +13,7 @@ from __future__ import annotations
 import logging
 import numpy as np
 from typing import NamedTuple
-from app.services.embedding_service import EmbeddingService
+from app.services.rag.embedding_service import EmbeddingService
 
 logger = logging.getLogger(__name__)
 
@@ -25,69 +25,97 @@ logger = logging.getLogger(__name__)
 DOMAIN_DESCRIPTIONS: dict[str, str] = {
 
     "structured_data": (
-        "Film database information and movie metadata including film title, cast, actors, "
+        "Factual and database-style information about specific films and people including "
+        "movie plot, story summary, synopsis, what happens in a film, cast, actors, "
         "director, release year, runtime, genre, rating, awards, nominations, box office, "
         "budget, production companies, streaming availability, where to watch, trailer, "
         "filmography of actors and directors, biographies of film personalities, "
-        "IMDb style movie details and factual information about films,top rated movies, top, "
-        "low rated movies, watch, download, watch online"
+        "IMDb style movie details, top rated movies, lowest rated movies. "
+        "ALSO includes real-time and recent cinema information including trending movies, "
+        "upcoming releases, current box office performance, breaking industry news, "
+        "recent awards results, new trailers, casting announcements, and any query referencing "
+        "current, latest, recent, new, upcoming, or this year."
     ),
 
     "film_criticism": (
-        "Film criticism and critical interpretation of movies and filmmakers including "
-        "analysis of directors, auteur style, thematic interpretation, symbolism, cultural "
-        "impact of films, retrospective evaluations, critical essays about cinema, "
-        "discussion of a director's body of work, comparisons between filmmakers, "
-        "interpretations of meaning, influence, artistic significance, and evaluation "
-        "of films within cinema culture."
+        "Critical interpretation and evaluative analysis of specific films or filmmakers "
+        "including auteur style, thematic analysis, symbolism, cultural impact, "
+        "retrospective evaluation, critical essays, discussion of a director's body of "
+        "work, comparisons between filmmakers, artistic significance, influence on cinema, "
+        "and meaning-making within film culture. Use for questions asking why a film is "
+        "considered great, what a director's style means, or how to interpret a film."
     ),
 
     "film_theory": (
-        "Academic film theory and philosophy of cinema including concepts such as "
-        "semiotics, structuralism, apparatus theory, spectatorship theory, ideology in film, "
-        "psychoanalytic film theory, feminist film theory, realism versus formalism, "
-        "montage theory, ontology of cinema, phenomenology of film experience, narrative "
-        "theory, suture, cinematic language, and theoretical frameworks used to analyze "
-        "how cinema creates meaning."
+        "Abstract academic frameworks and philosophy of cinema including semiotics, "
+        "structuralism, apparatus theory, spectatorship, ideology, psychoanalytic theory, "
+        "feminist film theory, realism versus formalism, montage theory, ontology of "
+        "cinema, phenomenology, narrative theory, suture, and theoretical concepts used "
+        "to explain how cinema as a medium creates meaning. Not about specific films — "
+        "about cinema as a conceptual and philosophical object."
     ),
 
     "film_history": (
-        "History of cinema including the evolution of film movements, cinematic eras and "
-        "historical developments in world cinema such as silent cinema, classical Hollywood, "
-        "German expressionism, Soviet montage, Italian neorealism, French new wave, "
-        "British new wave, film noir, new Hollywood, Iranian cinema, Japanese golden age, "
-        "parallel cinema, third cinema, and the cultural or political context that shaped "
-        "the development of cinema across decades. history of cinema evolution, film movements like french new wave and italian neorealism, development of world cinema across decades"
+        "History of cinema as a cultural and industrial institution including the "
+        "evolution of film movements, cinematic eras, and historical developments such as "
+        "silent cinema, German expressionism, Soviet montage, Italian neorealism, "
+        "French New Wave, British New Wave, film noir, New Hollywood, Iranian cinema, "
+        "Japanese golden age, parallel cinema, and third cinema. Use only when the "
+        "question is about a movement, era, or period in cinema history — NOT about "
+        "the content, plot, or meaning of any individual film."
     ),
 
     "film_aesthetics": (
-        "Film aesthetics and cinematic form including visual style, mise en scene, "
-        "cinematography, shot composition, lighting design, color palette, depth of field, "
-        "camera movement, tracking shots, editing rhythm, montage structure, sound design, "
-        "film score, diegetic and non diegetic sound, aspect ratio, visual storytelling, "
-        "film language and stylistic techniques used to construct cinematic meaning."
+        "Cinematic form and visual style including mise en scène, cinematography, "
+        "shot composition, lighting, color palette, depth of field, camera movement, "
+        "tracking shots, editing rhythm, montage structure, sound design, film score, "
+        "diegetic and non-diegetic sound, aspect ratio, and the technical and stylistic "
+        "techniques used to construct meaning on screen. Use for questions about how "
+        "a film looks, sounds, or is formally constructed."
+    ),
+
+    "film_analysis": (
+        "Close reading and detailed interpretation of specific films or a specific "
+        "filmmaker's body of work including scene-by-scene analysis, narrative structure "
+        "of a particular film, character interpretation, thematic breakdown, symbolic "
+        "reading, stylistic study of a director's technique across their filmography, "
+        "and auteur studies grounded in specific works. Use when the question is anchored "
+        "to a particular film or filmmaker — not cinema as a general concept. Examples: "
+        "analyzing Bergman's use of silence, interpreting the ending of a specific film, "
+        "comparing two films by the same director."
+    ),
+
+    "film_studies": (
+        "Academic film studies as a discipline including introductory textbooks, survey "
+        "courses, national cinema overviews, cultural and sociological studies of cinema "
+        "as an institution, gender and identity in cinema, postcolonial film studies, "
+        "Tamil cinema and Indian cinema as cultural systems, film and politics, "
+        "representation studies, and multi-perspective edited volumes that map a field "
+        "rather than argue a single interpretive position. Use when the question is "
+        "about cinema as a social, cultural, or institutional phenomenon rather than "
+        "about a specific film or theoretical concept."
     ),
 
     "film_production": (
-        "Filmmaking craft and production processes including directing, screenwriting, "
-        "story structure, character arcs, dialogue writing, screenplay development, "
-        "preproduction planning, shooting films, production workflow, cinematography "
-        "practice, editing workflow, post production, budgeting, financing, film "
-        "distribution, documentary filmmaking, and practical techniques used in "
-        "creating movies."
+        "Practical filmmaking craft and production process including directing technique, "
+        "screenwriting, story structure, character arcs, dialogue writing, screenplay "
+        "development, pre-production, shooting, cinematography practice, editing workflow, "
+        "post-production, budgeting, financing, distribution, and documentary filmmaking. "
+        "Use for how-to questions about making films."
     ),
 
     "film_scripts": (
         "Screenplays and film scripts including shooting scripts, screenplay format, "
-        "dialogue scenes, script structure, movie screenplays, downloadable scripts, "
-        "screenplay analysis, script breakdowns, and full text scripts of films."
+        "dialogue scenes, script structure, full text scripts of films, script breakdowns, "
+        "and screenplay analysis."
     ),
 
+
+
     "general": (
-        "General conversation, greetings, bot interaction, and questions about how to use FilmDB. "
-        "This includes greetings like hi, hello, howdy, but importantly also questions like "
-        "what can you do, what are your capabilities, how can you help me, what is this assistant "
-        "for. Strictly for non-movie and non-knowledge inquiries."
+        "General conversation, greetings, and questions about FilmDB itself including "
+        "hi, hello, what can you do, what are your capabilities, how can you help me, "
+        "and what is this assistant."
     ),
 }
 

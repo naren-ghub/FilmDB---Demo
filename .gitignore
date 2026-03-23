@@ -60,7 +60,7 @@ all_books_list.json
 audit_sorted.json
 
 # ChromaDB vector store — 2.2 GB of binary HNSW indices, regenerate with embed scripts
-rag/chromadb_store/
+rag/storage/
 
 # Temporary files from embedding pipeline
 tmp_centroids.json
@@ -71,6 +71,9 @@ agent_report/
 docs/
 scripts/
 
+fine-tuning/
+kb/
+output/
 
 
 2.html
@@ -83,3 +86,4 @@ backend/start_dev.ps1
 backend/uvicorn.toml
 backend/tests/
 backend/tests
+backend/app/services/kb_service/archive

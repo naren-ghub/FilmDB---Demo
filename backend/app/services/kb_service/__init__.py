@@ -2,11 +2,6 @@
 # These tools use the local Parquet KB data via FilmDBQueryEngine.
 
 from app.services.kb_service import (
-    kb_entity_lookup,
-    kb_plot_analysis,
-    kb_movie_similarity,
-    kb_top_rated,
-    kb_person_filmography,
-    kb_compare,
-    kb_awards,
+    recommendation_engine,
+    oscar_award,
 )

@@ -1,5 +1,6 @@
 
 import logging
+import threading
 import numpy as np
 from sentence_transformers import SentenceTransformer
 
@@ -17,11 +18,17 @@ class EmbeddingService:
     """
     _instance: "EmbeddingService | None" = None
     _model: SentenceTransformer | None = None
+    _lock = threading.Lock()
     MODEL_NAME = "BAAI/bge-base-en-v1.5"
 
     def __init__(self) -> None:
         if EmbeddingService._instance is not None:
-            raise RuntimeError("Use EmbeddingService.get_instance()")
+            import traceback
+            logger.warning(
+                "EmbeddingService() called directly — use get_instance() to share the singleton. "
+                "This will NOT reload the model but direct instantiation is incorrect.\n%s",
+                "".join(traceback.format_stack()),
+            )
 
     @classmethod
     def get_instance(cls) -> "EmbeddingService":
@@ -32,11 +39,22 @@ class EmbeddingService:
     @property
     def model(self) -> SentenceTransformer:
         if self._model is None:
-            import torch
-            device = "cuda" if torch.cuda.is_available() else "cpu"
-            logger.info("EmbeddingService: loading %s on %s …", self.MODEL_NAME, device.upper())
-            self._model = SentenceTransformer(self.MODEL_NAME, device=device)
-        return self._model
+            with self._lock:
+                # Re-check inside lock
+                if self._model is not None:
+                    return self._model
+                
+                import torch, os
+                device = "cuda" if torch.cuda.is_available() else "cpu"
+                logger.warning(
+                    "EmbeddingService: LOADING %s on %s (PID=%s) — "
+                    "this should only happen once at startup.",
+                    self.MODEL_NAME, device.upper(), os.getpid()
+                )
+                self.__class__._model = SentenceTransformer(self.MODEL_NAME, device=device)
+                self.__class__._model.to(device)
+                logger.info("EmbeddingService: model ready (dim=%d)", self.__class__._model.get_sentence_embedding_dimension())
+        return self.__class__._model
 
     def encode_query(self, text: str) -> np.ndarray:
         """Encode a user query with BGE asymmetric prefix. Returns L2-normalised float32 array."""

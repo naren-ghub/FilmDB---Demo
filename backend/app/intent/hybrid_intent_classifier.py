@@ -1,7 +1,7 @@
 """
 C.3 — HybridIntentClassifier
 ==============================
-3-tier hybrid intent classification pipeline that replaces the flat IntentAgent.
+3-tier hybrid intent classification pipeline.
 
 Tier 1  – DomainClassifier: embedding cosine similarity → domain + routing mode
 Tier 2  – Sub-intent agent (narrow LLM prompt per domain) → primary_intent + confidence
@@ -10,19 +10,12 @@ Tier 3  – Entity extraction: already handled by EntityResolver downstream
 Multi-domain mode (0.42 ≤ tier1_score < 0.68):
   – Both top-2 domains run their Tier 2 agents in parallel
   – Results are merged: primary intent from highest-confidence domain,
-    secondary intents include the second domain's primary intent
   – Tool selector receives BOTH domains to merge tool lists
-
-The existing IntentAgent is kept running in SHADOW MODE:
-  – Both classifiers run on every query
-  – Results logged to RequestLog (shadow_domain, shadow_intent columns)
-  – No user-facing code changed until you explicitly promote this classifier
 
 Usage:
     clf = HybridIntentClassifier(llm, secondary_llm=None)
     result = clf.classify(message)
-    # result has the same schema as IntentAgent.classify()
-    # plus:  result["domain"], result["secondary_domain"] (if multi-domain mode)
+    # result keys: primary_intent, secondary_intents, entities, confidence, domain
 """
 
 from __future__ import annotations
@@ -50,8 +43,8 @@ _SECONDARY_MERGE_INTENTS = {
 
 class HybridIntentClassifier:
     """
-    Drop-in replacement for IntentAgent.classify().
-    Returns the same dict schema as IntentAgent, plus 'domain' key.
+    3-tier hybrid intent classification pipeline.
+    Returns a dict with intent, domain, and confidence data.
     """
 
     def __init__(self, primary_llm, secondary_llm=None) -> None:
@@ -65,11 +58,7 @@ class HybridIntentClassifier:
 
     def classify(self, message: str) -> dict[str, Any]:
         """
-        Main entry point. Returns intent dict with same schema as IntentAgent,
-        plus:
-            domain          – primary domain chosen by Tier 1
-            secondary_domain – set when multi-domain mode triggered
-            classifier      – "hybrid" (for shadow logging)
+        Main entry point. Returns intent dict.
         """
 
         # ── Tier 1: Domain classification (Embedding Centroids) ───────────────

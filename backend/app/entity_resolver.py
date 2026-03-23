@@ -190,7 +190,7 @@ class EntityResolver:
                     canonical_val = _ALIAS_MAP.get(_normalize(val))
                     if not canonical_val:
                         try:
-                            from rag.filmdb_query_engine import FilmDBQueryEngine
+                            from rag.engine.filmdb_query_engine import FilmDBQueryEngine
                             engine = FilmDBQueryEngine.get_instance()
                             candidates = list(engine._title_index.keys())
                             if candidates:
@@ -210,20 +210,37 @@ class EntityResolver:
                 structured_entities.append({"type": etype, "value": val})
 
         # 3. Handle backwards compatibility (primary entity value/type)
-        # The legacy candidate extraction logic for single-entity fallback
+        # Prefer EntityMemory stack if available, else fall back to legacy flat fields
         legacy_candidate = _extract_candidate(message, intent)
         if not legacy_candidate and session_ctx:
-            if getattr(session_ctx, "last_movie", None):
-                legacy_candidate = session_ctx.last_movie
-                intent["primary_intent"] = "ENTITY_LOOKUP" 
-            elif getattr(session_ctx, "last_person", None):
-                legacy_candidate = session_ctx.last_person
-                intent["primary_intent"] = "PERSON_LOOKUP"
-            elif getattr(session_ctx, "last_entity", None):
-                legacy_candidate = session_ctx.last_entity
-                # If it's a generic entity, it's likely a conceptual query
-                if intent.get("primary_intent") == "GENERAL_CONVERSATION":
-                    intent["primary_intent"] = "CONCEPTUAL_EXPLANATION"
+            # Try EntityMemory stack first (more accurate than flat slots)
+            raw_stack = getattr(session_ctx, "entity_stack", None)
+            if raw_stack:
+                try:
+                    import json as _json
+                    from app.entity_memory import EntityMemory as _EM
+                    mem = _EM.from_json(raw_stack)
+                    primary_intent_local = intent.get("primary_intent", "")
+                    # For person-oriented intents, prefer person entity
+                    if primary_intent_local in ("PERSON_LOOKUP", "FILMOGRAPHY"):
+                        legacy_candidate = mem.primary_person() or mem.primary_movie() or ""
+                    else:
+                        legacy_candidate = mem.primary_movie() or mem.primary_person() or ""
+                except Exception:
+                    pass
+
+            # Final fallback to legacy flat slots if EntityMemory gave nothing
+            if not legacy_candidate:
+                if getattr(session_ctx, "last_movie", None):
+                    legacy_candidate = session_ctx.last_movie
+                    intent["primary_intent"] = "ENTITY_LOOKUP"
+                elif getattr(session_ctx, "last_person", None):
+                    legacy_candidate = session_ctx.last_person
+                    intent["primary_intent"] = "PERSON_LOOKUP"
+                elif getattr(session_ctx, "last_entity", None):
+                    legacy_candidate = session_ctx.last_entity
+                    if intent.get("primary_intent") == "GENERAL_CONVERSATION":
+                        intent["primary_intent"] = "CONCEPTUAL_EXPLANATION"
         
         # P4 fix #13: If we have a potential character name but no movie, bind to last_movie
         if legacy_candidate and session_ctx and session_ctx.last_movie:
@@ -261,7 +278,7 @@ class EntityResolver:
         # If not in hardcoded alias map, try dynamic fuzzy match against full KB
         if not canonical and legacy_candidate:
             try:
-                from rag.filmdb_query_engine import FilmDBQueryEngine
+                from rag.engine.filmdb_query_engine import FilmDBQueryEngine
                 engine = FilmDBQueryEngine.get_instance()
                 
                 # Check for exact match against titles first
@@ -293,7 +310,7 @@ class EntityResolver:
             # If year is missing from query, fetch it from KB for public domain check
             if not year and canonical_id:
                 try:
-                    from rag.filmdb_query_engine import FilmDBQueryEngine
+                    from rag.engine.filmdb_query_engine import FilmDBQueryEngine
                     engine = FilmDBQueryEngine.get_instance()
                     year = engine.get_movie_year(canonical_id)
                 except Exception:
@@ -319,7 +336,7 @@ class EntityResolver:
     def _resolve_imdb_id(self, title: str, year: str | None = None) -> str | None:
         """Try to resolve title to imdb_id via the FilmDB KB."""
         try:
-            from rag.filmdb_query_engine import FilmDBQueryEngine
+            from rag.engine.filmdb_query_engine import FilmDBQueryEngine
             engine = FilmDBQueryEngine.get_instance()
             return engine.resolve_title_to_imdb_id(title, year)
         except Exception as exc:

@@ -4,6 +4,17 @@ from dotenv import load_dotenv
 
 load_dotenv(override=True)
 
+# ── Model Cache Directory ─────────────────────────────────────────────────────
+# All sentence-transformers and HuggingFace models (bi-encoder, cross-encoder,
+# future models) are cached here so they're shared across projects on this machine.
+# Default: C:\Models\huggingface (can be overridden in .env via MODEL_CACHE_DIR)
+import os as _os
+_MODEL_CACHE = _os.getenv("MODEL_CACHE_DIR", r"C:\Models\huggingface")
+_os.environ.setdefault("HF_HOME",                   _MODEL_CACHE)
+_os.environ.setdefault("TRANSFORMERS_CACHE",         _MODEL_CACHE)
+_os.environ.setdefault("SENTENCE_TRANSFORMERS_HOME", _MODEL_CACHE)
+# ─────────────────────────────────────────────────────────────────────────────
+
 class Settings:
     GROQ_API_KEY = os.getenv("GROQ_API_KEY")
     GROQ_RESPONSE_API_KEY = os.getenv("GROQ_RESPONSE_API_KEY")
@@ -22,6 +33,9 @@ class Settings:
     WATCHMODE_API_KEY = os.getenv("WATCHMODE_API_KEY")
     SERPER_API_KEY = os.getenv("SERPER_API_KEY")
     TMDB_API_KEY = os.getenv("TMDB_API_KEY")
+    TASTEDIVE_API_KEY = os.getenv("TASTEDRIVE_API_KEY")  # Bridges TasteDrive typo from .env
+    EMBED_API_URL = os.getenv("EMBED_API_URL", "https://api.2embed.cc")
+    EMBED_BASE_URL = os.getenv("EMBED_BASE_URL", "https://www.2embed.cc")
     HTTP_TIMEOUT_SECONDS = float(os.getenv("HTTP_TIMEOUT_SECONDS", "15"))
 
 settings = Settings()
