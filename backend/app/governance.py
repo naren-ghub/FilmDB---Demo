@@ -155,3 +155,4 @@ def filter_tool_calls(
     if return_rejections:
         return approved, rejected
     return approved
+

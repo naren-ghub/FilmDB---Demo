@@ -444,3 +444,4 @@ def log_request(
         pass
     finally:
         db.close()
+

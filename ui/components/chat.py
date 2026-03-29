@@ -542,34 +542,95 @@ def _render_user_bubble(content: str) -> None:
 
 
 def _render_assistant_response(msg: dict, idx: int = 0) -> None:
-    """Deterministic rendering based on response_mode and entity_type."""
+    """Segment-based rendering: compose UI components from ordered layout_segments list."""
+    # Prefer dynamic segments from backend; fall back to legacy mode for old DB sessions
+    segments = msg.get("layout_segments")
+    if not segments:
+        segments = _legacy_mode_to_segments(msg)
+    for segment in segments:
+        _render_segment(segment, msg, idx)
+
+
+def _legacy_mode_to_segments(msg: dict) -> list:
+    """Convert old response_mode string → segments list for backward compat with DB-stored sessions."""
     mode = msg.get("response_mode", "EXPLANATION_ONLY")
-    text = msg.get("text_response", msg.get("content", ""))
-    poster = msg.get("poster_url", "")
-    entity_type = msg.get("entity_type", "")
-    streaming = msg.get("streaming", [])
-    recommendations = msg.get("recommendations", [])
-    sources = msg.get("sources", [])
-    download = msg.get("download_link", "")
-    genres = msg.get("genres", [])
-    awards = msg.get("awards", {})
-    trailer_key = msg.get("trailer_key", "")
+    _MAP = {
+        "FULL_CARD":                     ["MOVIE_CARD", "TRAILER_EMBED"],
+        "MINIMAL_CARD":                  ["TEXT_ONLY"],
+        "ANALYSIS_TEXT":                 ["ANALYSIS_TEXT"],
+        "FILMOGRAPHY_LIST":              ["PERSON_CARD"],
+        "COMPARISON_TABLE":              ["COMPARISON_TABLE"],
+        "AVAILABILITY_FOCUS":            ["TEXT_ONLY", "STREAMING_STRIP"],
+        "EXPLANATION_PLUS_AVAILABILITY": ["TEXT_ONLY", "STREAMING_STRIP"],
+        "RECOMMENDATION_GRID":           ["TEXT_ONLY", "RECOMMENDATION_GRID"],
+        "AWARDS_CARD":                   ["AWARDS_CARD"],
+        "CLARIFICATION":                 ["CLARIFICATION"],
+        "EXPLANATION_ONLY":              ["TEXT_ONLY"],
+    }
+    base = list(_MAP.get(mode, ["TEXT_ONLY"]))
+    extra: list = []
+    # Surface trailer for movie entities in old sessions that weren't FULL_CARD
+    if msg.get("trailer_key") and msg.get("entity_type") == "movie" and "TRAILER_EMBED" not in base:
+        extra.append("TRAILER_EMBED")
+    if msg.get("awards", {}).get("oscar_wins") or msg.get("awards", {}).get("oscar_nominations"):
+        if "AWARDS_CARD" not in base:
+            extra.append("AWARDS_CARD")
+    if msg.get("streaming") and "STREAMING_STRIP" not in base:
+        extra.append("STREAMING_STRIP")
+    if msg.get("recommendations") and "RECOMMENDATION_GRID" not in base:
+        extra.append("RECOMMENDATION_GRID")
+    if msg.get("download_link") and "DOWNLOAD_CARD" not in base:
+        extra.append("DOWNLOAD_CARD")
+    if msg.get("sources") and "SOURCES" not in base:
+        extra.append("SOURCES")
+    return base + extra
 
-    # ── PERSON CARD ────────────────────────────────────────────────────────────
-    if entity_type == "person" or mode in ("PERSON_LOOKUP", "FILMOGRAPHY"):
+
+def _render_segment(segment: str, msg: dict, idx: int) -> None:
+    """Render a single UI segment — unknown segments are silent no-ops (future-proofing)."""
+    if segment == "MOVIE_CARD":
+        _render_movie_card(msg, idx)
+    elif segment == "PERSON_CARD":
         _render_person_card(msg)
+    elif segment == "ANALYSIS_TEXT":
+        _render_with_spoiler_guard(msg.get("text_response", msg.get("content", "")), "ANALYSIS_TEXT")
+    elif segment == "AWARDS_CARD":
+        _render_awards_card(msg)
+    elif segment == "TRAILER_EMBED":
+        _render_trailer(msg)
+    elif segment == "STREAMING_STRIP":
+        _render_platforms(msg.get("streaming", []))
+    elif segment == "RECOMMENDATION_GRID":
+        _render_recommendations(msg.get("recommendations", []))
+    elif segment == "DOWNLOAD_CARD":
+        _render_download_card(msg)
+    elif segment == "SOURCES":
+        _render_sources(msg.get("sources", []))
+    elif segment == "COMPARISON_TABLE":
+        _render_comparison(msg)
+    elif segment == "CLARIFICATION":
+        _render_with_spoiler_guard(msg.get("text_response", msg.get("content", "")), "CLARIFICATION")
+    elif segment in ("TEXT_ONLY", "EXPLANATION_ONLY"):
+        _render_with_spoiler_guard(msg.get("text_response", msg.get("content", "")), segment)
+    # Unknown segment → silent no-op
 
-    # ── FULL MOVIE CARD (only for movie entities) ──────────────────────────────
-    elif mode == "FULL_CARD" and poster and entity_type != "person":
-        title = msg.get("title", "Unknown Title")
-        director = msg.get("director", "Unknown Director")
-        year = msg.get("year", "")
-        rating = msg.get("rating", "")
-        accent = _genre_accent(genres)
-        rating_html = _rating_gauge(rating)
-        badges_html = _award_badges(awards)
 
-        html = f"""
+def _render_movie_card(msg: dict, idx: int = 0) -> None:
+    """Glass-effect movie card with poster, metadata, rating gauge and LLM text.
+    NOTE: trailer is intentionally NOT embedded here — it is its own TRAILER_EMBED segment."""
+    poster  = msg.get("poster_url", "")
+    title   = msg.get("title", "Unknown Title")
+    director = msg.get("director", "Unknown Director")
+    year    = msg.get("year", "")
+    rating  = msg.get("rating", "")
+    genres  = msg.get("genres", [])
+    awards  = msg.get("awards", {})
+    text    = msg.get("text_response", msg.get("content", ""))
+    accent  = _genre_accent(genres)
+    rating_html = _rating_gauge(rating)
+    badges_html = _award_badges(awards)
+
+    html = f"""
 <div class="filmdb-glass-card filmdb-stagger-item" style="padding:18px; border-radius:12px;
      border-left:4px solid {accent}; margin-bottom:20px; overflow:auto;">
     <div style="float:left; margin:0 20px 10px 0;">
@@ -585,46 +646,64 @@ def _render_assistant_response(msg: dict, idx: int = 0) -> None:
 </div>
     </div>
 </div>""".strip()
-        st.markdown(html, unsafe_allow_html=True)
+    st.markdown(html, unsafe_allow_html=True)
 
-        # Trailer embed
-        if trailer_key:
-            st.markdown(
-                f'<div style="margin-top:12px; border-radius:8px; overflow:hidden;">'
-                f'<iframe width="100%" height="280" '
-                f'src="https://www.youtube.com/embed/{trailer_key}?rel=0" '
-                f'frameborder="0" allowfullscreen></iframe></div>',
-                unsafe_allow_html=True,
-            )
+    # Watchlist / Favourite buttons
+    col_w, col_f, _ = st.columns([2, 2, 6])
+    with col_w:
+        if st.button("📌 Watchlist", key=f"wl_{title[:14]}_{idx}", use_container_width=True):
+            _add_to_watchlist(title, msg.get("imdb_id", ""))
+    with col_f:
+        if st.button("❤️ Favourite", key=f"fav_{title[:14]}_{idx}", use_container_width=True):
+            _add_to_watchlist(title, msg.get("imdb_id", ""), list_key="favorites")
 
-        # Watchlist button
-        col_w, col_f, _ = st.columns([2, 2, 6])
-        with col_w:
-            if st.button("📌 Watchlist", key=f"wl_{title[:14]}_{idx}", use_container_width=True):
-                _add_to_watchlist(title, msg.get("imdb_id", ""))
-        with col_f:
-            if st.button("❤️ Favourite", key=f"fav_{title[:14]}_{idx}", use_container_width=True):
-                _add_to_watchlist(title, msg.get("imdb_id", ""), list_key="favorites")
 
-    # ── COMPARISON LAYOUT ──────────────────────────────────────────────────────
-    elif mode == "COMPARISON_TABLE":
-        _render_comparison(msg)
+def _render_trailer(msg: dict) -> None:
+    """YouTube iframe embed — liberated from the old FULL_CARD branch."""
+    trailer_key = msg.get("trailer_key", "")
+    if not trailer_key:
+        return
+    title = msg.get("title", "")
+    label = f"🎬  Official Trailer — {title}" if title else "🎬  Official Trailer"
+    st.markdown(
+        f'<div style="margin-top:12px; border-radius:8px; overflow:hidden;">'
+        f'<p style="font-size:0.78rem;color:#a0a0b8;font-weight:600;margin-bottom:6px;">{label}</p>'
+        f'<iframe width="100%" height="280" '
+        f'src="https://www.youtube.com/embed/{trailer_key}?rel=0&modestbranding=1" '
+        f'frameborder="0" allow="accelerometer; autoplay; clipboard-write; '
+        f'encrypted-media; gyroscope; picture-in-picture" allowfullscreen>'
+        f'</iframe></div>',
+        unsafe_allow_html=True,
+    )
 
-    # ── DEFAULT TEXT BUBBLE (all other modes) ─────────────────────────────────
-    else:
-        _render_with_spoiler_guard(text, mode)
 
-    # ── STREAMING PLATFORMS (only for movie entities) ─────────────────────────
-    if entity_type != "person" and mode in ("AVAILABILITY_FOCUS", "EXPLANATION_PLUS_AVAILABILITY", "FULL_CARD") and streaming:
-        _render_platforms(streaming)
+def _render_awards_card(msg: dict) -> None:
+    """Dedicated Oscar awards strip — fixes the ghost AWARDS_CARD mode."""
+    awards = msg.get("awards", {})
+    wins = awards.get("oscar_wins", [])
+    noms = awards.get("oscar_nominations", [])
+    if not wins and not noms:
+        return
+    items_html = ""
+    for w in wins:
+        items_html += f"<div style='padding:4px 0; font-size:0.88rem;'>🏆 {w}</div>"
+    for n in noms:
+        items_html += f"<div style='padding:4px 0; font-size:0.88rem; color:#a0a0b8;'>🎬 {n}</div>"
+    st.markdown(f"""
+<div class="filmdb-glass-card" style="padding:16px;border-left:4px solid #c9a227;margin-bottom:16px;">
+  <p style="font-size:0.75rem;color:#c9a227;font-weight:700;text-transform:uppercase;margin:0 0 10px 0;letter-spacing:0.06em;">
+    Academy Awards
+  </p>
+  {items_html}
+</div>""", unsafe_allow_html=True)
 
-    # ── RECOMMENDATIONS ────────────────────────────────────────────────────────
-    if recommendations and mode not in ("CLARIFICATION",):
-        _render_recommendations(recommendations)
 
-    # ── DOWNLOAD CARD ──────────────────────────────────────────────────────────
-    if download:
-        st.markdown(f"""
+def _render_download_card(msg: dict) -> None:
+    """Public domain download card."""
+    download = msg.get("download_link", "")
+    if not download:
+        return
+    st.markdown(f"""
 <div class="filmdb-download-card filmdb-stagger-item">
     <span style="font-size:1.8rem;">📦</span>
     <div style="flex:1;">
@@ -634,9 +713,6 @@ def _render_assistant_response(msg: dict, idx: int = 0) -> None:
     <a href="{download}" target="_blank" class="filmdb-download-btn">Download ↓</a>
 </div>""", unsafe_allow_html=True)
 
-    # ── SOURCES ────────────────────────────────────────────────────────────────
-    if sources:
-        _render_sources(sources)
 
 
 # ═══════════════════════════════════════════════════════════════

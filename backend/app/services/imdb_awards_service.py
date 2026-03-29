@@ -117,3 +117,4 @@ async def run(imdb_id: str) -> dict:
         except Exception as e:
             logger.error(f"IMDb Awards service failed for '{imdb_id}': {e}")
             return normalize_tool_output("error", {"imdb_id": imdb_id, "reason": str(e)})
+

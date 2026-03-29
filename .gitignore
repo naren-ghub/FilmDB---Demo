@@ -88,3 +88,6 @@ backend/uvicorn.toml
 backend/tests/
 backend/tests
 backend/app/services/kb_service/archive
+bulk_audit.py
+check_usage.py
+test_cerebras.py

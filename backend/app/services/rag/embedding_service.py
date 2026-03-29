@@ -78,3 +78,4 @@ class EmbeddingService:
             batch_size=batch_size,
             convert_to_numpy=True,
         ).astype("float32")
+

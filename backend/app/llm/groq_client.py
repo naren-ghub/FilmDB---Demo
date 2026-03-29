@@ -110,6 +110,8 @@ class GroqClient:
                 "temperature": temperature,
                 "timeout": 45.0,  # Increased timeout for verbose reasoning
             }
+            key_mask = f"{self.api_key[:8]}...{self.api_key[-4:]}" if self.api_key else "NONE"
+            logging.getLogger(__name__).info("Groq Request: model=%s key=%s", self.model, key_mask)
             if max_tokens:
                 kwargs["max_tokens"] = max_tokens
             if require_json:
@@ -232,3 +234,4 @@ class GroqClient:
                 "reasoning": "",
             }
         return {"tools_required": [], "confidence": 100, "reasoning": ""}
+

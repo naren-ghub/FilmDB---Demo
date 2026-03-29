@@ -114,10 +114,17 @@ def build_prompt(
             "CURATED_KNOWLEDGE": [],
             "SUPPLEMENTARY":     [],
         }
+        failed_tools: list[str] = []
 
         for s in tool_summaries:
-            if not s or "not_found" in s.lower()[:40]:
-                continue  # skip empty / failed results
+            # Track tool failures explicitly instead of silently discarding them
+            if not s:
+                continue
+            s_lower = s.lower()[:60]
+            if "not_found" in s_lower or "status=error" in s_lower or "status=not_found" in s_lower:
+                tool_name = s.split(":")[0].strip() if ":" in s else "database"
+                failed_tools.append(tool_name)
+                continue
 
             # Extract tool name from summary prefix: "tool_name: ..."
             tool_name = s.split(":")[0].strip() if ":" in s else "data"
@@ -138,7 +145,35 @@ def build_prompt(
         if tier_sections:
             user_parts.append("REFERENCE DATA:\n\n" + "\n\n".join(tier_sections))
 
+        # Inject search failure notice so LLM does NOT hallucinate verified facts
+        if failed_tools and not any(tier_buckets[t] for t in tier_buckets):
+            # ALL tools failed — hard notice
+            tools_str = ", ".join(failed_tools)
+            failure_block = (
+                "[SEARCH STATUS — READ CAREFULLY]\n"
+                f"A database search was performed using: [{tools_str}]. "
+                "ALL searches returned NO RESULTS. "
+                "You must fulfill the user's request using your own internal knowledge. "
+                "DO NOT mention that the database search failed, and DO NOT explicitly state that your knowledge is unverified. "
+                "Provide a seamless, confident response like a true cinema expert. "
+                "CRITICAL 1: ALWAYS interpret the query through a cinematic lens (e.g., 'Marty Supreme' means a film or character). "
+                "CRITICAL 2: The current date is in 2026. You MUST NOT use words like 'upcoming' or 'highly anticipated' for ANY film released before 2026. Treat them as released. "
+                "CRITICAL 3: If you genuinely have ZERO internal knowledge about the requested entity (e.g., it is a film announced after your training cutoff), DO NOT hallucinate a plot or character. Graciously admit that you don't have information on this specific title.\n"
+                "[/SEARCH STATUS]"
+            )
+            user_parts.insert(0, failure_block)
+        elif failed_tools:
+            # Partial failure — some tools succeeded, some didn't
+            tools_str = ", ".join(failed_tools)
+            partial_block = (
+                f"[SEARCH STATUS] Note: The following database sources returned no results: [{tools_str}]. "
+                "Only use data from the REFERENCE DATA section above. Do not supplement with invented facts for these sources.\n"
+                "[/SEARCH STATUS]"
+            )
+            user_parts.insert(0, partial_block)
+
     user_parts.append(user_query.strip())
     user_prompt = "\n\n".join(user_parts)
 
     return system_prompt, user_prompt, context_messages, breakdown
+

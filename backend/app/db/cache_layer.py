@@ -93,3 +93,4 @@ def set_similarity_cache(db: Session, title: str, recommendations: dict) -> Simi
     db.commit()
     db.refresh(row)
     return row
+

@@ -164,3 +164,4 @@ def deserialize_categories(raw: str | list | None) -> list[str]:
         return data if isinstance(data, list) else []
     except (json.JSONDecodeError, TypeError):
         return []
+

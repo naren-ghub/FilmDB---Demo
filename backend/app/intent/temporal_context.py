@@ -143,3 +143,4 @@ class TemporalContextBuilder:
             "detected_years":         [],
             "note": "No temporal signals — answer from training knowledge",
         }
+

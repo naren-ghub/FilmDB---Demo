@@ -25,7 +25,7 @@ log = logging.getLogger(__name__)
 class RecommendationEngine:
     def __init__(self):
         # Lazy import after sys.path is bootstrapped above
-        from rag.engine.filmdb_query_engine import FilmDBQueryEngine
+        from kb.engine.filmdb_query_engine import FilmDBQueryEngine
         self.engine = FilmDBQueryEngine.get_instance()
         self.embedder = EmbeddingService.get_instance()
         self.collection_name = "movie_metadata"
@@ -269,3 +269,4 @@ async def run(query: str = "", imdb_id: Optional[str] = None, profile: str = "SI
     except Exception as e:
          logger.error(f"Error in RecommendationEngine tool: {e}", exc_info=True)
          return {"status": "error", "error": str(e)}
+

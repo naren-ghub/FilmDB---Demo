@@ -29,3 +29,4 @@ def _is_pronoun_only(message: str) -> bool:
     text = message.lower().strip()
     pronouns = ["him", "her", "it", "that", "this", "they", "them"]
     return len(text.split()) <= 4 and any(_has_whole_word(text, p) for p in pronouns)
+

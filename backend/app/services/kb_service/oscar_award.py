@@ -18,7 +18,7 @@ async def run(
     """
     Lookup Oscar awards and nominations for a movie or person.
     """
-    from rag.engine.filmdb_query_engine import FilmDBQueryEngine
+    from kb.engine.filmdb_query_engine import FilmDBQueryEngine
 
     engine = FilmDBQueryEngine.get_instance()
     
@@ -80,3 +80,4 @@ async def run(
         }
         
     return {"status": "error", "message": "Must provide either movie_title or person_name"}
+

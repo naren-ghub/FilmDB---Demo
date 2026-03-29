@@ -167,3 +167,4 @@ def _merge_entities(a: list, b: list) -> list:
             seen.add(key)
             merged.append(ent)
     return merged
+

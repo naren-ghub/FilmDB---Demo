@@ -18,7 +18,8 @@ _os.environ.setdefault("SENTENCE_TRANSFORMERS_HOME", _MODEL_CACHE)
 class Settings:
     GROQ_API_KEY = os.getenv("GROQ_API_KEY")
     GROQ_RESPONSE_API_KEY = os.getenv("GROQ_RESPONSE_API_KEY")
-    GROQ_MODEL = os.getenv("GROQ_MODEL", "qwen/qwen3-32b")
+    GROQ_INTENT_API_KEY = os.getenv("GROQ_INTENT_API_KEY")
+    GROQ_MODEL = os.getenv("GROQ_MODEL", "qwen3-32b")
     # Calculate project root (assuming this file is in backend/app/config.py)
     BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     _DB_NAME = "FilmDB_Demo.db"
@@ -39,3 +40,4 @@ class Settings:
     HTTP_TIMEOUT_SECONDS = float(os.getenv("HTTP_TIMEOUT_SECONDS", "15"))
 
 settings = Settings()
+

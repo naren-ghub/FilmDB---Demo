@@ -67,3 +67,126 @@ def select_response_mode(
         return "RECOMMENDATION_GRID"
 
     return "EXPLANATION_ONLY"
+
+
+SEGMENT_MOVIE_CARD   = "MOVIE_CARD"       # replaces FULL_CARD / MINIMAL_CARD
+SEGMENT_PERSON_CARD  = "PERSON_CARD"      # replaces FILMOGRAPHY_LIST
+SEGMENT_ANALYSIS     = "ANALYSIS_TEXT"    # rich essay block
+SEGMENT_AWARDS       = "AWARDS_CARD"      # Oscar / IMDB award strip
+SEGMENT_TRAILER      = "TRAILER_EMBED"    # YouTube iframe — was only in FULL_CARD branch
+SEGMENT_STREAMING    = "STREAMING_STRIP"  # platform badges
+SEGMENT_RECS         = "RECOMMENDATION_GRID"
+SEGMENT_COMPARISON   = "COMPARISON_TABLE"
+SEGMENT_DOWNLOAD     = "DOWNLOAD_CARD"
+SEGMENT_SOURCES      = "SOURCES"
+SEGMENT_CLARIFY      = "CLARIFICATION"
+SEGMENT_TEXT         = "TEXT_ONLY"        # plain prose (always last)
+
+def select_layout_segments(
+    primary_intent: str,
+    secondary_intents: list[str],
+    tool_outputs: dict[str, dict],
+    response: dict,
+) -> list[str]:
+    """
+    Returns an ordered list of UI segments.
+    First segment is the 'hero' (determines vertical layout anchor).
+    Subsequent segments are appended below the hero.
+    """
+    segments: list[str] = []
+
+    # ── Guard: disambiguation always wins alone ──
+    for out in tool_outputs.values():
+        if out.get("status") == "disambiguation":
+            return [SEGMENT_CLARIFY]
+
+    # ── Guard: illegal download ──
+    if primary_intent == "ILLEGAL_DOWNLOAD_REQUEST":
+        return [SEGMENT_TEXT]
+
+    # ── Hero segment — what is the response primarily about? ──
+    entity_type = response.get("entity_type", "")
+    has_poster   = bool(response.get("poster_url"))
+    has_awards   = bool(response.get("awards", {}).get("oscar_wins") or 
+                        response.get("awards", {}).get("oscar_nominations"))
+    has_streaming = bool(response.get("streaming"))
+    has_recs      = bool(response.get("recommendations"))
+    has_filmography = bool(response.get("filmography"))
+
+    analysis_intents = {
+        "FILM_ANALYSIS", "VISUAL_ANALYSIS", "DIRECTOR_ANALYSIS",
+        "CONCEPTUAL_EXPLANATION", "THEORETICAL_ANALYSIS",
+        "MOVEMENT_OVERVIEW", "HISTORICAL_CONTEXT", "STYLE_COMPARISON",
+        "FILM_COMPARISON", "CRITIC_REVIEW", "PLOT_EXPLANATION",
+    }
+
+    # Hero: Person card
+    if entity_type == "person" or primary_intent in ("PERSON_LOOKUP", "FILMOGRAPHY"):
+        segments.append(SEGMENT_PERSON_CARD)
+
+    # Hero: Comparison
+    elif primary_intent == "COMPARISON":
+        segments.append(SEGMENT_COMPARISON)
+
+    # Hero: Streaming-first (handled before movie-card check so it doesn't get a poster card)
+    elif primary_intent == "STREAMING_AVAILABILITY":
+        segments.append(SEGMENT_TEXT)
+        if has_streaming:
+            segments.append(SEGMENT_STREAMING)
+        return segments                  # streaming-only, no other segments
+
+    # Hero: Recommendation grid
+    elif primary_intent in ("RECOMMENDATION", "TRENDING", "UPCOMING", "TOP_RATED"):
+        segments.append(SEGMENT_TEXT)
+        if has_recs:
+            segments.append(SEGMENT_RECS)
+        return segments
+
+    # Hero: Analysis intents — poster anchors the essay, then ANALYSIS_TEXT follows
+    elif primary_intent in analysis_intents:
+        if has_poster and entity_type == "movie":
+            segments.append(SEGMENT_MOVIE_CARD)   # poster acts as visual anchor
+        segments.append(SEGMENT_ANALYSIS)          # always include the essay
+
+    # Hero: Movie card (entity lookups, awards, etc. — not analysis, not recs, not streaming)
+    elif entity_type == "movie" and has_poster:
+        segments.append(SEGMENT_MOVIE_CARD)
+
+    else:
+        segments.append(SEGMENT_TEXT)
+
+    # ── Additive panels (attached below the hero) ──
+    # Trailer: shown for movie entities whenever trailer_key is present.
+    # Intentionally placed after MOVIE_CARD but before awards/streaming so
+    # the video anchors engagement before metadata strips appear.
+    has_trailer = bool(response.get("trailer_key"))
+    if has_trailer and entity_type == "movie" and SEGMENT_TRAILER not in segments:
+        # Don't embed trailer for pure recommendation / streaming / award-only queries
+        _no_trailer_intents = {"RECOMMENDATION", "TRENDING", "UPCOMING",
+                               "TOP_RATED", "STREAMING_AVAILABILITY"}
+        if primary_intent not in _no_trailer_intents:
+            segments.append(SEGMENT_TRAILER)
+
+    if has_awards and SEGMENT_AWARDS not in segments:
+        segments.append(SEGMENT_AWARDS)
+
+    if has_streaming and SEGMENT_STREAMING not in segments:
+        segments.append(SEGMENT_STREAMING)
+
+    if has_recs and SEGMENT_RECS not in segments:
+        segments.append(SEGMENT_RECS)
+
+    if response.get("download_link"):
+        segments.append(SEGMENT_DOWNLOAD)
+
+    if response.get("sources"):
+        segments.append(SEGMENT_SOURCES)
+
+    # Always ensure text exists if not already a text-producing segment
+    text_producers = {SEGMENT_TEXT, SEGMENT_ANALYSIS, SEGMENT_MOVIE_CARD,
+                      SEGMENT_PERSON_CARD, SEGMENT_COMPARISON}
+    if not any(s in text_producers for s in segments):
+        segments.insert(0, SEGMENT_TEXT)
+
+    return segments
+

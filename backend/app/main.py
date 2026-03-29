@@ -1,9 +1,13 @@
 import sys
 from pathlib import Path
 
-# Bootstrap project root onto sys.path so `rag` package is always importable
-# regardless of whether PYTHONPATH was set before launching uvicorn.
-_PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+# Add backend/ to sys.path so `app.*` modules are importable.
+_BACKEND_DIR = Path(__file__).resolve().parent.parent
+if str(_BACKEND_DIR) not in sys.path:
+    sys.path.insert(0, str(_BACKEND_DIR))
+
+# Add project root to sys.path so `kb.*` (FilmDBQueryEngine) is importable.
+_PROJECT_ROOT = _BACKEND_DIR.parent
 if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
 
@@ -44,7 +48,7 @@ def startup() -> None:
     def _eager_load_task():
         log.info("Eager-loading heavy models in BACKGROUND thread (PID %s) ...", os.getpid())
         try:
-            from rag.engine.filmdb_query_engine import FilmDBQueryEngine
+            from kb.engine.filmdb_query_engine import FilmDBQueryEngine
             FilmDBQueryEngine.get_instance()
             log.info("  FilmDBQueryEngine background load complete.")
 
@@ -183,3 +187,4 @@ def get_token_usage():
         content=_TOKEN_REPORT.read_text(encoding="utf-8"),
         media_type="text/markdown",
     )
+

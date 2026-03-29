@@ -286,3 +286,4 @@ async def get_person(name: str) -> dict:
         "place_of_birth": details.get("place_of_birth"),
     }
     return normalize_tool_output("success", data)
+

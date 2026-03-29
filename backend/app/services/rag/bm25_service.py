@@ -61,3 +61,4 @@ class BM25Service:
                 results.append((doc_ids[idx], float(score)))
                 
         return results
+

@@ -34,7 +34,7 @@ from app.intent.hybrid_intent_classifier import HybridIntentClassifier  # kept f
 from app.intent.unified_intent_tool_agent import UnifiedIntentToolAgent
 from app.intent.domain_classifier import DomainClassifier
 from app.llm.groq_client import GroqClient  # kept for shadow mode / fallback
-from app.layout_policy import select_response_mode
+from app.layout_policy import select_response_mode, select_layout_segments
 from app.utils.prompt_builder import build_prompt
 from app.utils.tool_formatter import summarize_all
 from app import services
@@ -86,19 +86,24 @@ SOURCE DISCIPLINE:
 - You MAY draw on your own knowledge to supplement any tier, but never to CONTRADICT [VERIFIED FACTS].
 - Never use labels like "TOOL DATA", "reference data", "VERIFIED FACTS", or any internal system terms in your response.
 
-WHEN NO REFERENCE DATA IS AVAILABLE:
-- Use your knowledge but qualify specific factual claims: "Based on what I know..."
-- Do NOT fabricate dates, award counts, or box office numbers you are unsure about.
-- Do NOT agree with user corrections without verification — say "That's worth verifying with proper sources."
-- Never hallucinate recommendations. Only suggest films you are highly confident about.
-- For disambiguation (multiple matches), list the options and ask the user to clarify.
-- If the user asks about very recent events (post March 2025), clearly acknowledge your knowledge cutoff.
+WHEN SEARCH STATUS INDICATES NO RESULTS:
+- You must answer the user's query seamlessly using your internal knowledge.
+- DO NOT mention that the entity is not in the database.
+- DO NOT explicitly state that your knowledge is unverified or from general knowledge.
+- CRITICAL: Even if the database fails, YOU ARE A CINEMA EXPERT. ALWAYS interpret ambiguous queries (like "Oppenheimer" or "Jobs") as referring to movies, actors, or directors — NOT general history or generic science.
+- DO NOT hallucinate, invent, or guess precise ratings, release dates, streaming platforms, or box office numbers. Keep the summary qualitative and factual based on your training.
+- If the entity is entirely outside your training knowledge (e.g. a very recent film), gracefully admit you don't know it instead of inventing a character or plot.
+
+STRICT TEMPORAL CONSISTENCY:
+- Pay strict attention to the current date/year provided in the TEMPORAL CONTEXT.
+- If today's year is 2026, you MUST NOT refer to a film from 2023 or 2024 as "upcoming" or "highly anticipated" just because it was upcoming in your pre-training data. Re-align your internal knowledge to match the current date.
 
 FOLLOW-UP SUGGESTIONS (when instructed):
 - If FOLLOW-UP SUGGESTIONS appear in the dynamic instructions, add exactly 1 brief, natural sentence at the very end of your response.
 - Example: "If you're curious, I can also explore its themes and cinematography."
 - Never add follow-up suggestions unless explicitly instructed — do not manufacture them.
 """
+
 
 
 def _resolve_tool_group(tool_names: list[str]) -> str:
@@ -112,6 +117,11 @@ class ConversationEngine:
 
     def __init__(self) -> None:
         self.llm = GroqClient(api_key=settings.GROQ_API_KEY)
+        
+        # Dedicated key for intent classification to prevent rate limit collisions
+        intent_key = settings.GROQ_INTENT_API_KEY or settings.GROQ_API_KEY
+        self.intent_client = GroqClient(api_key=intent_key)
+
         # Use a dedicated key for response generation if provided, else reuse the main key
         response_key = settings.GROQ_RESPONSE_API_KEY or settings.GROQ_API_KEY
         self.response_client = GroqClient(api_key=response_key)
@@ -139,7 +149,11 @@ class ConversationEngine:
         self, session_id: str, user_id: str, message: str
     ) -> tuple[Dict[str, Any], dict[str, Any]]:
         db = SessionLocal()
-        start_llm_calls = getattr(self.llm, "total_calls", 0) + getattr(self.response_client, "total_calls", 0)
+        start_llm_calls = (
+            getattr(self.llm, "total_calls", 0) + 
+            getattr(self.intent_client, "total_calls", 0) + 
+            getattr(self.response_client, "total_calls", 0)
+        )
         trace: dict[str, Any] = {
             "session_id": session_id,
             "user_id": user_id,
@@ -175,7 +189,7 @@ class ConversationEngine:
             # ── Tier 2: Unified intent + tool selection (1 LLM call) ─────────
             if self._USE_UNIFIED_AGENT:
                 agent_result = self.unified_agent.classify_and_select(
-                    resolved_message, domain_result, self.llm
+                    resolved_message, domain_result, self.intent_client
                 )
                 # Shape agent output into the existing `intent` dict contract
                 # (all downstream code uses intent.get("primary_intent") etc.)
@@ -368,6 +382,23 @@ class ConversationEngine:
             tool_outputs, tool_trace = await self._execute_tools(
                 session_id, approved_calls, profile, resolved_message
             )
+
+            # E.7 — Dynamic Fallback: Intercept empty DB results for recent entities
+            # If TMDB/RAG failed and no web search was performed, force one
+            failed_db = False
+            for t_name, t_out in tool_outputs.items():
+                if t_name in ("tmdb", "rag") and t_out.get("status") in ("not_found", "error"):
+                    failed_db = True
+
+            if failed_db and "cinema_search" not in tool_outputs:
+                self.logger.warning("Primary database tool returned empty. Triggering automatic cinema_search fallback for '%s'", resolved_message)
+                fb_calls = [{"name": "cinema_search", "arguments": {"query": resolved_message}}]
+                fb_out, fb_trace = await self._execute_tools(
+                    session_id, fb_calls, profile, resolved_message
+                )
+                tool_outputs.update(fb_out)
+                if "tool_timings" in tool_trace and "tool_timings" in fb_trace:
+                    tool_trace["tool_timings"].extend(fb_trace["tool_timings"])
             trace["tool_outputs"] = tool_outputs
             trace["tool_execution"] = tool_trace
 
@@ -376,21 +407,23 @@ class ConversationEngine:
             primary_intent = intent.get("primary_intent", "ENTITY_LOOKUP")
             domain = intent.get("domain", "structured_data")
             dynamic_instr = SYSTEM_INSTRUCTIONS
+            
+            # Temporal awareness (Prepend to top so it's never ignored)
+            current_date_str = datetime.now(timezone.utc).strftime("%A, %B %d, %Y")
+            temporal_header = (
+                f"TEMPORAL CONTEXT: Today is {current_date_str}. "
+                f"Your training knowledge cutoff is approximately March 2025. "
+                f"For events, releases, awards, or news after March 2025, rely only on provided tool data — do NOT guess. "
+                f"If no tool data covers recent events the user asks about, clearly state your knowledge cutoff.\n\n"
+            )
+            dynamic_instr = temporal_header + dynamic_instr
 
             # Streaming context
             if primary_intent == "STREAMING_AVAILABILITY":
+
                 dynamic_instr += "\n\nSESSION CONTEXT: The user is asking for streaming availability. You MUST provide a dedicated 'Streaming Availability' section listing all platforms from the reference data."
             else:
                 dynamic_instr += "\n\nSESSION CONTEXT: Do NOT mention streaming platforms or 'Where to Watch' in your text response — this is already shown in the UI card footer. Focus on other aspects."
-
-            # Temporal awareness
-            current_date_str = datetime.now(timezone.utc).strftime("%A, %B %d, %Y")
-            dynamic_instr += (
-                f"\n\nTEMPORAL CONTEXT: Today is {current_date_str}. "
-                f"Your training knowledge cutoff is approximately March 2025. "
-                f"For events, releases, awards, or news after March 2025, rely only on provided tool data — do NOT guess. "
-                f"If no tool data covers recent events the user asks about, clearly state your knowledge cutoff."
-            )
 
             # Follow-up hint injection (Option B + C)
             current_category = classify_query_category(resolved_message, primary_intent)
@@ -399,6 +432,7 @@ class ConversationEngine:
                 current_category=current_category,
                 primary_entity=entity_mem.primary_movie() or entity_mem.primary_person(),
             )
+
             if followup_hints:
                 hints_str = " | ".join(followup_hints)
                 dynamic_instr += (
@@ -468,6 +502,14 @@ class ConversationEngine:
             response = self._build_response(final_text, tool_outputs)
             response["response_mode"] = response_mode
             trace["response_mode"] = response_mode
+            # Dynamic layout: compute segment list from the fully-built response dict
+            # so the selector can inspect real data (poster_url, awards, trailer_key …)
+            response["layout_segments"] = select_layout_segments(
+                intent.get("primary_intent", "ENTITY_LOOKUP"),
+                intent.get("secondary_intents", []),
+                tool_outputs,
+                response,
+            )
 
             # Generate smart chat title for the first turn (DE-LLM'd for efficiency)
             if not _recent_msgs:
@@ -814,7 +856,7 @@ class ConversationEngine:
         
         if (not is_tamil or not is_indian) and resolved_entity.get("canonical_id"):
             try:
-                from rag.engine.filmdb_query_engine import FilmDBQueryEngine
+                from kb.engine.filmdb_query_engine import FilmDBQueryEngine
                 engine = FilmDBQueryEngine.get_instance()
                 movie_data = engine.entity_lookup(resolved_entity["canonical_id"])
                 
@@ -1053,7 +1095,7 @@ class ConversationEngine:
         if award_calls:
             # Try to resolve title → IMDb ID once and share it
             if not imdb_id:
-                from rag.engine.filmdb_query_engine import FilmDBQueryEngine
+                from kb.engine.filmdb_query_engine import FilmDBQueryEngine
                 engine = FilmDBQueryEngine.get_instance()
                 imdb_id = engine.resolve_title_to_imdb_id(title)
 
@@ -1721,3 +1763,4 @@ class ConversationEngine:
                     set_similarity_cache(db, title, similarity.get("data", {}))
         finally:
             db.close()
+

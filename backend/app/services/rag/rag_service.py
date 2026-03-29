@@ -564,7 +564,7 @@ class RAGService:
 
         if imdb_id:
             try:
-                from rag.engine.filmdb_query_engine import FilmDBQueryEngine
+                from kb.engine.filmdb_query_engine import FilmDBQueryEngine
                 engine = FilmDBQueryEngine.get_instance()
                 entity = engine.entity_lookup(imdb_id)
                 if entity and entity.get("title"):
@@ -823,3 +823,4 @@ class RAGService:
 
     def query_multi(self, query: str, top_k: int = 6) -> list[dict]:
         return self.query(query, domains=ALL_DOMAINS, top_k=top_k)
+

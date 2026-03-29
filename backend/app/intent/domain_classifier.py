@@ -176,3 +176,4 @@ class DomainClassifier:
             return DomainResult(top1_domain, top1_score, top2_list, "multi")
         else:
             return DomainResult("structured_data", top1_score, top2_list, "default")
+

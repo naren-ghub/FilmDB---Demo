@@ -390,3 +390,4 @@ async def run(query: str, limit: int = 6, priority_groups: List[str] | None = No
             _SEARCH_CACHE.pop(next(iter(_SEARCH_CACHE)))
 
     return normalize_tool_output("success", {"results": extracted_data, "query": query})
+

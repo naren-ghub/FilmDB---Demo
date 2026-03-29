@@ -333,3 +333,4 @@ def _ensure_entity_memory_columns() -> None:
             conn.commit()
         except Exception:
             pass
+

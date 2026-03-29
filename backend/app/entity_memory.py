@@ -168,3 +168,4 @@ class EntityMemory:
     def __repr__(self) -> str:
         items = ", ".join(f"{e['value']}({e['score']:.2f})" for e in self.entities)
         return f"EntityMemory([{items}])"
+

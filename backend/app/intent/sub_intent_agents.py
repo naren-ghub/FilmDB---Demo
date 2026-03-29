@@ -368,3 +368,4 @@ DOMAIN_AGENTS: dict[str, object] = {
     "live_search":     LiveSearchAgent(),
     "general":         GeneralAgent(),
 }
+

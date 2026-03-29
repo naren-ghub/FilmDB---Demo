@@ -35,7 +35,12 @@ _AWARD_KEYWORDS = ("oscar", "oscars", "academy awards", "nominations", "best pic
 
 # Phrases to strip from user messages to extract the actual movie/person name
 _FILLER_PATTERNS = [
-    r"^(?:te+l+\s+me\s+(?:about|abt)|what (?:is|are)|show me|find|search for|look up|get|give me)\s+",
+    r"^(?:te+l+\s+me\s+(?:about|abt)|what (?:is|are)|show me|find|search for|look up|look for|get|give me|get me info on|get me information on)\s+",
+    r"^(?:search for (?:the )?(?:movie|film|show)\s+)",   # "search for movie X" → "X"
+    r"^(?:find (?:the )?(?:movie|film|show)\s+)",          # "find movie X" → "X"
+    r"^(?:updates? (?:on|for|about)\s+)",                  # "updates on dune 3"
+    r"^(?:latest (?:on|about|for|news\s+about|news\s+on)\s+)",
+    r"^(?:news (?:on|about|for)\s+)",
     r"^(?:who is|who are|who was)\s+",
     r"^(?:plot (?:summary|of)|summary of|synopsis of|overview of|details of|info on|information about)\s+",
     r"^(?:where can i (?:stream|watch)|stream|watch)\s+",
@@ -57,6 +62,7 @@ _FILLER_PATTERNS = [
 _TRAILING_PATTERNS = [
     r"\s+(?:movie|film|series|show|documentary)$",
     r"\s+(?:in \w+|\d{4})$",
+    r"\s+(?:updates?|news|latest|status)$",  # "dune 3 updates" → "dune 3"
     r"\s*\?$",
 ]
 
@@ -190,7 +196,7 @@ class EntityResolver:
                     canonical_val = _ALIAS_MAP.get(_normalize(val))
                     if not canonical_val:
                         try:
-                            from rag.engine.filmdb_query_engine import FilmDBQueryEngine
+                            from kb.engine.filmdb_query_engine import FilmDBQueryEngine
                             engine = FilmDBQueryEngine.get_instance()
                             candidates = list(engine._title_index.keys())
                             if candidates:
@@ -260,7 +266,7 @@ class EntityResolver:
                 break
                 
         if not primary_entity_type:
-             if "person" in [_infer_entity_type(message, intent) for _ in range(1)] if "who is" in normalized_message else False: pass # Skipped legacy infer for brevity
+             # Award keywords take priority
              if any(keyword in normalized_message for keyword in _AWARD_KEYWORDS):
                  primary_entity_type = "award_event"
              elif "who is" in normalized_message or "biography" in normalized_message or re.search(r"\b(?:best|top|great(?:est)?|famous)\s+(?:movies?|films?)\s+(?:by|of|from)\b", normalized_message):
@@ -278,7 +284,7 @@ class EntityResolver:
         # If not in hardcoded alias map, try dynamic fuzzy match against full KB
         if not canonical and legacy_candidate:
             try:
-                from rag.engine.filmdb_query_engine import FilmDBQueryEngine
+                from kb.engine.filmdb_query_engine import FilmDBQueryEngine
                 engine = FilmDBQueryEngine.get_instance()
                 
                 # Check for exact match against titles first
@@ -310,7 +316,7 @@ class EntityResolver:
             # If year is missing from query, fetch it from KB for public domain check
             if not year and canonical_id:
                 try:
-                    from rag.engine.filmdb_query_engine import FilmDBQueryEngine
+                    from kb.engine.filmdb_query_engine import FilmDBQueryEngine
                     engine = FilmDBQueryEngine.get_instance()
                     year = engine.get_movie_year(canonical_id)
                 except Exception:
@@ -336,9 +342,10 @@ class EntityResolver:
     def _resolve_imdb_id(self, title: str, year: str | None = None) -> str | None:
         """Try to resolve title to imdb_id via the FilmDB KB."""
         try:
-            from rag.engine.filmdb_query_engine import FilmDBQueryEngine
+            from kb.engine.filmdb_query_engine import FilmDBQueryEngine
             engine = FilmDBQueryEngine.get_instance()
             return engine.resolve_title_to_imdb_id(title, year)
         except Exception as exc:
             self._log.debug("KB imdb_id resolution failed: %s", exc)
             return None
+
